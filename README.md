@@ -6,6 +6,13 @@ A synthesizer whose voices are two nuclear spins. A classical simulation of a tw
 
 > Ελληνικά: ένα συνθεσάιζερ με φωνές δύο πυρηνικά σπιν. Μια κλασική προσομοίωση NMR δύο σπιν οδηγεί ένα φίλτρο σκάλας τεσσάρων πόλων και μια μηχανή psytrance στα 145 BPM. Για εκλαΐκευση και live DJ sets. Η διεπαφή είναι στα ελληνικά και στα αγγλικά.
 
+## Listen
+
+- [`media/two-spins-five-moments.mp3`](media/two-spins-five-moments.mp3): *Two Spins, Five Moments* (4:05, mastered to −14 LUFS)
+- [`media/spin-ladder_145bpm_E_16bars.wav`](media/spin-ladder_145bpm_E_16bars.wav): a 16-bar loop at 145 BPM in E, ready for a DJ deck
+
+Both are rendered by `npm run render` from the same engine the instrument uses.
+
 ## What you can do
 
 - **Play live.** Space starts and stops. Keys 1–5 load scenes: Clean spin, Echo on the beat, Two beating spins, Bell silence, Studie II.
