@@ -1,0 +1,14 @@
+{
+  "name": "spin-ladder-synth",
+  "version": "1.0.0",
+  "description": "A two-spin NMR synthesizer with a ladder filter, a psytrance groove engine and an autopilot lesson. Classical simulation, browser only.",
+  "private": true,
+  "scripts": {
+    "fixture": "node scripts/make-fixture.js",
+    "test": "node test/verify.js",
+    "build": "node scripts/build.js",
+    "render": "node scripts/render.js",
+    "all": "npm run fixture && npm test && npm run build"
+  },
+  "engines": { "node": ">=18" }
+}

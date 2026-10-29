@@ -1,0 +1,1493 @@
+<!doctype html>
+<html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Spin Ladder Synth</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Advent+Pro:wght@500;600;700&family=Commissioner:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Διάταξη: πάνελ οργάνου για σκοτεινή σκηνή — «οθόνη» παλμογράφου διπλής δέσμης αριστερά,
+   rack με modules δεξιά, γραμμή σύνθεσης από κάτω. Σκόπιμα μόνο σκούρο θέμα (live χρήση σε σκοτάδι).
+   CH1 κεχριμπαρί = σπιν q0 (αριστερό κανάλι), CH2 κυανό = σπιν q1 (δεξί), όπως στους παλμογράφους. */
+:root {
+  --ground: #0d1016;
+  --panel: #151a23;
+  --panel-2: #1c2230;
+  --line: #2a3243;
+  --ink: #e7eaf0;
+  --ink-dim: #9ba4b6;
+  --ch1: #ffc53d;
+  --ch2: #4fd8e0;
+  --live: #ff6b5a;
+  --f-display: "Advent Pro", "Commissioner", system-ui, sans-serif;
+  --f-body: "Commissioner", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+  color-scheme: dark;
+}
+html, body { background: var(--ground); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 15px; line-height: 1.5; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 40px; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ground); }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ch2); outline-offset: 2px; }
+.wrap { max-width: 1380px; margin: 0 auto; display: grid; gap: 14px; }
+
+/* ---- πάνω γραμμή ---- */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--ground); display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-block: 12px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
+.brand h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 30px; letter-spacing: .06em; line-height: 1; text-transform: uppercase; }
+.brand h1 span { color: var(--ch1); }
+.brand p { margin: 2px 0 0; color: var(--ink-dim); font-size: 12.5px; }
+.play { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ch1); background: transparent; color: var(--ch1); border-radius: 999px; padding: 8px 18px; font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.play[aria-pressed="true"] { background: var(--ch1); color: var(--ground); }
+.play .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.play[aria-pressed="true"] .dot { animation: beat calc(60s / var(--bpm, 145)) infinite; }
+@keyframes beat { 0% { transform: scale(1.5); } 40% { transform: scale(1); } }
+.bpm { display: flex; align-items: center; gap: 4px; font-family: var(--f-mono); }
+.bpm input { width: 64px; text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 4px; font-variant-numeric: tabular-nums; }
+.chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.chip:hover { border-color: var(--ink-dim); }
+.chip[aria-pressed="true"] { border-color: var(--ch2); color: var(--ch2); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 6px 11px; cursor: pointer; font-size: 13px; font-family: var(--f-mono); }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--ch2); }
+
+/* ---- κύριο πλέγμα ---- */
+.main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 960px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; max-width: 100%; }
+.stage:fullscreen { display: grid; place-items: center; background: var(--ground); border: 0; }
+.stage:fullscreen canvas { width: 100vw; height: 100vh; aspect-ratio: auto; }
+.readout { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 10px 14px; border-top: 1px solid var(--line); font-family: var(--f-mono); font-size: 12.5px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .q0 { color: var(--ch1); } .readout .q1 { color: var(--ch2); }
+.stage-tools { position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); right: 10px; display: flex; gap: 6px; }
+.scenes { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); align-items: center; }
+.scenes .lbl { font-family: var(--f-display); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: 12px; color: var(--ink-dim); margin-right: 4px; }
+.scenes kbd { font-family: var(--f-mono); font-size: 11px; color: var(--ink-dim); margin-left: 4px; }
+
+/* ---- rack ---- */
+.rack { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.mod { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px 12px; display: grid; gap: 8px; min-width: 0; }
+.mod h2 { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-family: var(--f-display); font-weight: 700; font-size: 15px; letter-spacing: .16em; text-transform: uppercase; }
+.mod h2 small { font-family: var(--f-body); font-weight: 400; font-size: 11.5px; letter-spacing: 0; text-transform: none; color: var(--ink-dim); text-align: right; }
+.knobs { display: flex; flex-wrap: wrap; gap: 6px 4px; }
+.knob { width: 74px; display: grid; justify-items: center; gap: 0; position: relative; }
+.knob svg { width: 56px; height: 56px; cursor: ns-resize; touch-action: none; }
+.knob .kl { font-family: var(--f-display); font-weight: 600; font-size: 12.5px; letter-spacing: .05em; text-align: center; line-height: 1.15; }
+.knob .kv { font-family: var(--f-mono); font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
+.knob input { position: absolute; inset: 0 0 auto; width: 56px; height: 56px; margin: 0 auto; opacity: 0; pointer-events: none; }
+.knob:focus-within svg { outline: 2px solid var(--ch2); outline-offset: 1px; border-radius: 50%; }
+.knob.learn svg { outline: 2px dashed var(--live); border-radius: 50%; }
+.row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
+.row label { color: var(--ink-dim); }
+.row select, .row input[type=number] { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.row input[type=number] { width: 92px; font-family: var(--f-mono); }
+.note { font-size: 12px; color: var(--ink-dim); margin: 0; }
+
+/* ---- τι ακούς ---- */
+.hear { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.hear article { border-top: 2px solid var(--line); padding-top: 8px; min-width: 0; }
+.hear article.on { border-top-color: var(--ch1); }
+.hear h3 { margin: 0 0 2px; font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: .03em; }
+.hear p { margin: 0; font-size: 13.5px; color: var(--ink-dim); }
+
+/* ---- σύνθεση ---- */
+.piece { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
+.piece-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.piece-head h2 { margin: 0 auto 0 0; font-family: var(--f-display); font-weight: 700; font-size: 24px; letter-spacing: .03em; text-wrap: balance; }
+.piece-head h2 small { display: block; font-family: var(--f-body); font-weight: 400; font-size: 13px; color: var(--ink-dim); letter-spacing: 0; }
+.tl { position: relative; display: flex; height: 54px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.tl div { border-right: 1px solid var(--line); padding: 4px 6px; font-family: var(--f-display); font-weight: 600; font-size: 12.5px; line-height: 1.15; overflow: hidden; min-width: 0; background: var(--panel-2); cursor: pointer; }
+.tl div.on { background: color-mix(in srgb, var(--ch1) 18%, var(--panel-2)); }
+.tl div b { display: block; font-family: var(--f-mono); font-size: 11px; color: var(--ink-dim); font-weight: 400; }
+.tl .ph { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ch1); left: 0; pointer-events: none; padding: 0; border: 0; }
+.caption { margin: 0; font-size: 14px; max-width: 75ch; min-height: 3em; }
+.status { font-family: var(--f-mono); font-size: 12px; color: var(--ink-dim); }
+
+/* ---- εργαλεία ---- */
+.tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.tools .mod p { margin: 0; }
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 13.5px; }
+.btn:hover { border-color: var(--ink-dim); }
+.btn:disabled { opacity: .45; cursor: default; }
+.file input { font-size: 12.5px; max-width: 100%; }
+
+/* ---- κάτω από το καπό ---- */
+details.hood { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
+details.hood summary { cursor: pointer; font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .04em; }
+.hood-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 12px; }
+.hood h3 { margin: 0 0 6px; font-family: var(--f-display); font-size: 16px; letter-spacing: .04em; }
+.hood p, .hood li { font-size: 13.5px; color: var(--ink-dim); max-width: 68ch; }
+.hood ul { padding-left: 18px; margin: 0; display: grid; gap: 4px; }
+.eq { font-family: var(--f-mono); font-size: 12.5px; color: var(--ink); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; overflow-x: auto; white-space: pre; }
+.vt { overflow-x: auto; }
+.vt table { border-collapse: collapse; font-size: 12px; font-family: var(--f-mono); width: 100%; }
+.vt td, .vt th { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; font-variant-numeric: tabular-nums; }
+.vt th { color: var(--ink-dim); font-weight: 400; }
+.ok { color: var(--ch2); }
+.credit { font-size: 12.5px; color: var(--ink-dim); margin: 0; }
+.toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 20; max-width: calc(100% - 32px); }
+/* ---- μάθημα ---- */
+.play.lessonb { border-color: var(--ch2); color: var(--ch2); }
+.play.lessonb[aria-pressed="true"] { background: var(--ch2); color: var(--ground); }
+.lesson { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: var(--panel); border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-top: 10px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -10px 30px rgba(0, 0, 0, .45); }
+.lesson-in { max-width: 1380px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; align-items: end; }
+.l-track { display: flex; gap: 3px; margin-bottom: 8px; }
+.l-track span { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.l-track span i { display: block; height: 100%; width: 0; background: var(--ch1); }
+.l-track span.now { outline: 1px solid var(--ch1); outline-offset: 1px; }
+.l-head { display: flex; align-items: baseline; gap: 10px; }
+.l-no { font-family: var(--f-mono); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.l-head h3 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 22px; letter-spacing: .03em; text-wrap: balance; }
+.lesson p { margin: 2px 0 0; font-size: 14px; color: var(--ink-dim); max-width: 80ch; }
+.l-live { font-family: var(--f-mono); font-size: 12.5px; color: var(--ch1); min-height: 1.4em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.l-ctl { display: flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 640px) { .lesson-in { grid-template-columns: minmax(0, 1fr); } .l-head h3 { font-size: 19px; } .lesson p { font-size: 13px; } }
+.focus svg, .focus.chip, .focus.seg, select.focus { animation: pulse 1.2s ease-out infinite; border-radius: 999px; }
+.knob.focus svg { border-radius: 50%; }
+.stage.focus { box-shadow: 0 0 0 2px var(--ch1); }
+.mod.focus-mod { border-color: var(--ch1); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ch1) 70%, transparent); } 100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--ch1) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .play[aria-pressed="true"] .dot { animation: none; } .focus svg, .focus.chip, .focus.seg, select.focus { animation: none; box-shadow: 0 0 0 3px var(--ch1); } }
+</style>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand">
+      <h1>Spin <span>Ladder</span></h1>
+      <p data-i18n="tagline">Δύο σπιν πυρήνων, ένα φίλτρο σκάλας, 145 BPM</p>
+    </div>
+    <button class="play" id="play" aria-pressed="false"><span class="dot"></span><span data-i18n="play">Παίξε</span></button>
+    <button class="play lessonb" id="lessonBtn" aria-pressed="false"><span data-i18n="lessonBtn">Μάθημα</span></button>
+    <div class="bpm"><button class="chip" id="bpmDown" aria-label="−1 BPM">−</button><input id="bpm" type="number" min="90" max="200" value="145" aria-label="BPM"><button class="chip" id="bpmUp" aria-label="+1 BPM">+</button><button class="chip" id="tap">TAP</button></div>
+    <div class="seg" role="group" aria-label="Language"><button id="lang-el" aria-pressed="true">ΕΛ</button><button id="lang-en" aria-pressed="false">EN</button></div>
+  </header>
+
+  <section class="main">
+    <div>
+      <div class="stage" id="stage">
+        <canvas id="scope" width="1280" height="800" aria-label="Spin vectors and dual-trace oscilloscope"></canvas>
+        <div class="stage-tools"><button class="chip" id="fs" data-i18n="fullscreen">Πλήρης οθόνη</button></div>
+      </div>
+      <div class="readout" id="readout" aria-live="polite"></div>
+      <div class="scenes" id="scenes"><span class="lbl" data-i18n="scenes">Σκηνές</span></div>
+    </div>
+
+    <div class="rack">
+      <section class="mod" aria-labelledby="m-spin">
+        <h2 id="m-spin"><span data-i18n="mSpin">Σπιν</span><small data-i18n="mSpinS">πώς σβήνει και πόσο «χτυπά»</small></h2>
+        <div class="knobs">
+          <div class="knob" data-k="T2s"></div><div class="knob" data-k="T2"></div><div class="knob" data-k="J"></div><div class="knob" data-k="S"></div>
+        </div>
+      </section>
+      <section class="mod" aria-labelledby="m-echo">
+        <h2 id="m-echo"><span data-i18n="mEcho">Ηχώ spin</span><small data-i18n="mEchoS">παλμός π τη στιγμή τ</small></h2>
+        <div class="knobs"><div class="knob" data-k="tau"></div></div>
+        <div class="row"><button class="chip" id="echo" aria-pressed="false" data-i18n="echoOn">Ηχώ</button>
+          <label for="sync" data-i18n="sync">Συγχρονισμός 2τ</label>
+          <select id="sync"><option value="0" data-i18n="free">ελεύθερο</option><option value="1">1/16</option><option value="2">1/8</option><option value="3">3/16</option><option value="4">1/4</option></select></div>
+      </section>
+      <section class="mod" aria-labelledby="m-link">
+        <h2 id="m-link"><span data-i18n="mLink">Σύνδεση</span><small data-i18n="mLinkS">πύλη CNOT και θερμοκρασία γείτονα</small></h2>
+        <div class="knobs"><div class="knob" data-k="e"></div><div class="knob" data-k="p"></div></div>
+        <div class="row"><label data-i18n="basis">Βάση μέτρησης</label><div class="seg" role="group" id="basis"><button data-b="Z" aria-pressed="true">Z</button><button data-b="X" aria-pressed="false">X</button><button data-b="Y" aria-pressed="false">Y</button></div></div>
+      </section>
+      <section class="mod" aria-labelledby="m-lad">
+        <h2 id="m-lad"><span data-i18n="mLad">Φίλτρο σκάλας</span><small data-i18n="mLadS">4 πόλοι, −24 dB/οκτάβα</small></h2>
+        <div class="knobs"><div class="knob" data-k="bright"></div><div class="knob" data-k="kKnob"></div><div class="knob" data-k="bassBright"></div></div>
+      </section>
+      <section class="mod" aria-labelledby="m-grv">
+        <h2 id="m-grv"><span data-i18n="mGroove">Groove</span><small data-i18n="mGrooveS">ο κανόνας Born διαλέγει τις νότες</small></h2>
+        <div class="knobs"><div class="knob" data-k="density"></div><div class="knob" data-k="leadOct"></div></div>
+        <div class="row">
+          <label for="pattern" data-i18n="pattern">Μοτίβο</label>
+          <select id="pattern"><option value="rolling">rolling</option><option value="gallop">gallop</option><option value="half">half-time</option><option value="none" data-i18n="noDrums">χωρίς ρυθμό</option></select>
+          <label for="root" data-i18n="root">Τονικό</label>
+          <select id="root"><option value="28">E</option><option value="29">F</option><option value="30">F♯</option><option value="31">G</option><option value="33">A</option><option value="26">D</option></select>
+        </div>
+        <div class="row">
+          <label for="tuning" data-i18n="tuning">Κούρδισμα</label>
+          <select id="tuning"><option value="tet" data-i18n="tet">12-TET, A4 = 435 Hz</option><option value="studie">Studie II · 5^(n/25)</option></select>
+          <label for="seed">seed</label><input id="seed" type="number" value="271828"><button class="chip" id="dice" aria-label="New seed">⟳</button>
+        </div>
+      </section>
+      <section class="mod" aria-labelledby="m-mix">
+        <h2 id="m-mix"><span data-i18n="mMix">Μίξη</span><small data-i18n="mMixS">kick και hat: κλασικά</small></h2>
+        <div class="knobs"><div class="knob" data-k="mkick"></div><div class="knob" data-k="mbass"></div><div class="knob" data-k="mhat"></div><div class="knob" data-k="mlead"></div></div>
+      </section>
+    </div>
+  </section>
+
+  <section class="hear" id="hear" aria-label="What you hear">
+    <article data-h="fid"><h3 data-i18n="h1t">Ο ήχος είναι ένα σπιν που γυρίζει</h3><p data-i18n="h1">Κάθε νότα είναι η μαγνήτιση ενός πυρήνα που περιστρέφεται και σβήνει (FID). Το σβήσιμο δεν είναι ADSR: το ορίζουν τα T2 και T2*.</p></article>
+    <article data-h="echo"><h3 data-i18n="h2t">Ο ήχος που επιστρέφει</h3><p data-i18n="h2">Με την ηχώ, ο ήχος σβήνει και ξαναγυρίζει στο 2τ χωρίς νέο χτύπημα. Το σβήσιμο από T2* ήταν αποσυγχρονισμός, όχι χαμένη ενέργεια.</p></article>
+    <article data-h="j"><h3 data-i18n="h3t">Ρυθμός ή τόνος;</h3><p data-i18n="h3">Η σύζευξη J σπάει τη γραμμή σε δύο. Αργά ακούγεται σαν παλμός· γρήγορα, σαν δύο νότες. Είναι το ίδιο φαινόμενο σε άλλη ταχύτητα.</p></article>
+    <article data-h="bell"><h3 data-i18n="h4t">Η σιωπή της εμπλοκής</h3><p data-i18n="h4">Η πύλη CNOT μεταφέρει τη συνοχή σε συσχετίσεις των δύο σπιν και το τοπικό σήμα σβήνει. Μόνο αν ο γείτονας είναι «κρύος» η κατάσταση είναι πραγματικά εμπλεγμένη, και τότε τραγουδά το φίλτρο.</p></article>
+  </section>
+
+  <section class="piece" aria-labelledby="pt">
+    <div class="piece-head">
+      <h2 id="pt"><span data-i18n="pieceT">Δύο σπιν, πέντε στιγμές</span><small data-i18n="pieceS">Σύνθεση σε μορφή στιγμών, εμπνευσμένη από τον Stockhausen · 4 λεπτά</small></h2>
+      <button class="btn" id="piecePlay" data-i18n="piecePlay">Απόδοση και αναπαραγωγή</button>
+      <button class="btn" id="pieceStop" disabled data-i18n="stop">Στοπ</button>
+      <button class="btn" id="pieceSave" disabled data-i18n="saveWav">Αποθήκευση WAV</button>
+    </div>
+    <div class="tl" id="tl"><span class="ph" id="ph"></span></div>
+    <p class="caption" id="caption"></p>
+    <span class="status" id="pieceStatus"></span>
+  </section>
+
+  <section class="tools">
+    <section class="mod">
+      <h2><span data-i18n="tLoop">Loop για DJ</span></h2>
+      <p class="note" data-i18n="tLoopN">Αποδίδει τα τρέχοντα κουμπιά σε μέτρα ακριβή στο δείγμα, με το BPM και το τονικό στο όνομα αρχείου.</p>
+      <div class="row"><label for="bars" data-i18n="bars">Μέτρα</label><select id="bars"><option>4</option><option>8</option><option selected>16</option><option>32</option></select><button class="btn" id="loopSave" data-i18n="saveLoop">Αποθήκευση loop</button></div>
+      <span class="status" id="loopStatus"></span>
+    </section>
+    <section class="mod">
+      <h2><span data-i18n="tFid">FID από το Studio</span></h2>
+      <p class="note" data-i18n="tFidN">Φόρτωσε ένα αρχείο εξαγωγής FID (JSON) από το Quantum Music Studio. Το lead θα παίζει αυτό το σήμα, τεντωμένο στη διάρκεια κάθε νότας.</p>
+      <div class="row file"><input type="file" id="fidFile" accept=".json,application/json"><button class="btn" id="fidClear" disabled data-i18n="clear">Καθαρισμός</button></div>
+      <span class="status" id="fidStatus"></span>
+    </section>
+    <section class="mod">
+      <h2><span>MIDI</span></h2>
+      <p class="note" data-i18n="tMidiN">Νότες από πληκτρολόγιο παίζουν το lead (A4 = 435 Hz). Τα CC 1–8 οδηγούν σύνδεση, γείτονα, T2*, J, τ, φωτεινότητα, συντονισμό, διαστολή. «Εκμάθηση»: πάτα το, κάνε κλικ σε κουμπί, κούνησε έναν ελεγκτή.</p>
+      <div class="row"><button class="btn" id="midiOn" data-i18n="midiConnect">Σύνδεση MIDI</button><button class="btn" id="midiLearn" disabled data-i18n="midiLearn">Εκμάθηση</button></div>
+      <span class="status" id="midiStatus"></span>
+    </section>
+  </section>
+
+  <details class="hood">
+    <summary data-i18n="hood">Κάτω από το καπό: μοντέλο, αντιστοιχίσεις, έλεγχοι</summary>
+    <div class="hood-grid">
+      <div>
+        <h3 data-i18n="hModel">Το φυσικό μοντέλο</h3>
+        <div class="eq">ρ(0) = U (|+⟩⟨+| ⊗ diag(1−p, p)) U†
+U = ελεγχόμενη R_y(πe), q0 → q1
+H/h = ν₀I_z⁰ + ν₁I_z¹ + J·I_z⁰I_z¹
+
+s_q(t) = 2 Σ_b c_b e^(i2π f_b t′) e^(−t/T₂) e^(−|t′|(1/T₂* − 1/T₂))
+f_b = ν_q + J(½ − b)
+ηχώ (π στο τ):  t′ = t − 2τ,  c_b → c_b*
+|s(2τ)| = e^(−2τ/T₂)
+
+ακουστικός χρόνος = S · φυσικός χρόνος
+y(u) = G · Re[ s(u) · e^(i2π f_c u) ]   (A4 = 435 Hz)
+C = (1 − 2p) · sin(πe/2)</div>
+        <p data-i18n="hModelP">Το μοντέλο και οι συμβάσεις (A4 = 435 Hz, q0 αριστερά / q1 δεξιά, y = G·Re[s·e^{i2πf u}]) προέρχονται από το NMR Lab του Quantum Music Studio. Απλοποιήσεις: ιδανικοί παλμοί, ανομοιογένεια με κατανομή Lorentz (ώστε 1/T₂* = 1/T₂ + 1/T₂′), επιλεκτικός π μόνο στο σπιν που ακούμε, χωρίς θόρυβο δέκτη.</p>
+      </div>
+      <div>
+        <h3 data-i18n="hMap">Τι είναι φυσική και τι σχεδιαστική επιλογή</h3>
+        <ul>
+          <li data-i18n="map1">Φυσική: το σχήμα και το σβήσιμο κάθε νότας, η επιστροφή στο 2τ, οι δύο γραμμές J, η σιωπή μετά την CNOT, οι πιθανότητες των μετρήσεων.</li>
+          <li data-i18n="map2">Επιλογή: η συχνότητα φίλτρου ακολουθεί το |s(t)|, ο συντονισμός ακολουθεί το C (k = k₀(1−C) + 4,3·C), οι εκβάσεις 00/01/10/11 γίνονται θεμέλιο / τρίτονο / τρίτονο κάτω / οκτάβα.</li>
+          <li data-i18n="map3">Κλασικά: kick, hi-hat, ο κορεσμός tanh, το μικρό «χτύπημα» που διεγείρει το φίλτρο, η ψευδοτυχαία γεννήτρια με seed.</li>
+          <li data-i18n="map4">Όλος ο ήχος παράγεται κλασικά από μια κλασική προσομοίωση. Δεν ακούμε κβαντικό υπολογιστή.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 data-i18n="hVer">Αριθμητικοί έλεγχοι του μοντέλου</h3>
+        <div class="vt" id="vt"></div>
+      </div>
+    </div>
+    <p class="credit" data-i18n="credit">Βασισμένο στο Quantum Music Studio της Panagiota (Γιώτας) Brousali, διπλωματική εργασία, ΣΕΜΦΕ ΕΜΠ. Η σύνθεση είναι πρωτότυπη, σε πνεύμα Stockhausen (κλίμακα της Studie II, συνέχεια ρυθμού–τόνου, μορφή στιγμών) και δεν αναπαράγει έργα του.</p>
+  </details>
+</div>
+<section class="lesson" id="lesson" hidden aria-live="polite" aria-label="Lesson">
+  <div class="lesson-in">
+    <div style="min-width:0">
+      <div class="l-track" id="lTrack"></div>
+      <div class="l-head"><span class="l-no" id="lNo"></span><h3 id="lTitle"></h3></div>
+      <p id="lText"></p>
+      <div class="l-live" id="lLive"></div>
+    </div>
+    <div class="l-ctl"><button class="btn" id="lPause"></button><button class="btn" id="lNext"></button><button class="btn" id="lExit"></button></div>
+  </div>
+</section>
+<div class="toast" id="toast" hidden></div>
+
+<script id="engine">
+/* =====================================================================
+   Spin Ladder Synth — μηχανή φυσικής και σύνθεσης (καθαρή JavaScript)
+   Βασίζεται στο μοντέλο NMR δύο σπιν του Quantum Music Studio
+   (Panagiota Brousali, ΣΕΜΦΕ/ΕΜΠ), με τις ίδιες συμβάσεις:
+   A4 = 435 Hz, s = Tr[ρ σ⁻] ανά qubit, y = G·Re[s·e^{i2πf_c u}].
+   Δεν εξαρτάται από DOM ή Web Audio· τρέχει σε φυλλομετρητή και σε Node.
+   ===================================================================== */
+(function (root) {
+  'use strict';
+  const TAU = 2 * Math.PI;
+
+  /* ---------- μιγαδικοί 4×4 πίνακες: {re: Float64Array(16), im: ...} ---------- */
+  function cm(re, im) { return { re: Float64Array.from(re || new Array(16).fill(0)), im: Float64Array.from(im || new Array(16).fill(0)) }; }
+  function cmul(A, B) {
+    const C = cm();
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      let r = 0, m = 0;
+      for (let k = 0; k < 4; k++) {
+        const ar = A.re[4 * i + k], ai = A.im[4 * i + k], br = B.re[4 * k + j], bi = B.im[4 * k + j];
+        r += ar * br - ai * bi; m += ar * bi + ai * br;
+      }
+      C.re[4 * i + j] = r; C.im[4 * i + j] = m;
+    }
+    return C;
+  }
+  function cadj(A) { const C = cm(); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { C.re[4 * i + j] = A.re[4 * j + i]; C.im[4 * i + j] = -A.im[4 * j + i]; } return C; }
+  function cconj(A) { const C = cm(A.re, A.im); for (let i = 0; i < 16; i++) C.im[i] = -C.im[i]; return C; }
+  function kron2(a, b) { // a, b: 2×2 {re:[4], im:[4]}
+    const C = cm();
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) for (let l = 0; l < 2; l++) {
+      const ar = a.re[2 * i + j], ai = a.im[2 * i + j], br = b.re[2 * k + l], bi = b.im[2 * k + l];
+      const r = 2 * i + k, c = 2 * j + l;
+      C.re[4 * r + c] = ar * br - ai * bi; C.im[4 * r + c] = ar * bi + ai * br;
+    }
+    return C;
+  }
+  const m2 = (re, im) => ({ re: re, im: im || [0, 0, 0, 0] });
+
+  /* ---------- προετοιμασία κατάστασης ----------
+     ρ(0) = U (|+⟩⟨+| ⊗ diag(1−p, p)) U†,  U = ελεγχόμενη R_y(πe) από q0 σε q1.
+     Δείκτης βάσης i = 2·b0 + b1 (q0 το σημαντικότερο ψηφίο).
+     e: «εμπλοκή» 0…1 · p: ανάμειξη (θερμοκρασία) του συντρόφου 0…0,5 */
+  function prepare(e, p) {
+    const plus = m2([0.5, 0.5, 0.5, 0.5]);
+    const partner = m2([1 - p, 0, 0, p]);
+    const rho0 = kron2(plus, partner);
+    const th = Math.PI * e, c = Math.cos(th / 2), s = Math.sin(th / 2);
+    const U = cm([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, c, -s, 0, 0, s, c]);
+    const rho = cmul(cmul(U, rho0), cadj(U));
+    return describe(rho);
+  }
+  function describe(rho) {
+    // συνοχές μονού κβάντου κάθε σπιν, χωρισμένες ανά κατάσταση του γείτονα (γραμμές J)
+    const coh0 = [0, 1].map(b => ({ re: rho.re[4 * b + 2 + b], im: rho.im[4 * b + 2 + b] }));       // ρ[(0b),(1b)]
+    const coh1 = [0, 1].map(a => ({ re: rho.re[4 * (2 * a) + 2 * a + 1], im: rho.im[4 * (2 * a) + 2 * a + 1] })); // ρ[(a0),(a1)]
+    const pop1q0 = rho.re[10] + rho.re[15], pop1q1 = rho.re[5] + rho.re[15];
+    return { rho, coh: [coh0, coh1], pop1: [pop1q0, pop1q1], C: concurrence(rho), purity: purity(rho) };
+  }
+  function purity(rho) { const r2 = cmul(rho, rho); let t = 0; for (let i = 0; i < 4; i++) t += r2.re[5 * i]; return t; }
+
+  /* ---------- concurrence (Wootters 1998) ----------
+     ρ̃ = (σy⊗σy) ρ* (σy⊗σy), λ_i = √(ιδιοτιμές του ρρ̃) φθίνουσες,
+     C = max(0, λ1 − λ2 − λ3 − λ4). Ιδιοτιμές: Faddeev–LeVerrier + Durand–Kerner. */
+  function concurrence(rho) {
+    const yy = cm([0, 0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0]);
+    const rt = cmul(cmul(yy, cconj(rho)), yy);
+    const { w, V } = jacobiHerm(rho);
+    const D = cm(); for (let i = 0; i < 4; i++) D.re[5 * i] = Math.sqrt(Math.max(0, w[i]));
+    const sq = cmul(cmul(V, D), cadj(V));                    // √ρ
+    const H = cmul(cmul(sq, rt), sq);                        // √ρ ρ̃ √ρ (ερμιτιανός, θετικός)
+    const ev = jacobiHerm(H).w.map(x => Math.sqrt(Math.max(0, x))).sort((a, b) => b - a);
+    return Math.max(0, ev[0] - ev[1] - ev[2] - ev[3]);
+  }
+  /* ιδιοτιμές/ιδιοδιανύσματα ερμιτιανού 4×4 με μιγαδικές περιστροφές Jacobi */
+  function jacobiHerm(A0) {
+    let A = cm(A0.re, A0.im); let V = cm(); for (let i = 0; i < 4; i++) V.re[5 * i] = 1;
+    for (let sweep = 0; sweep < 60; sweep++) {
+      let off = 0; for (let p = 0; p < 4; p++) for (let q = p + 1; q < 4; q++) off += Math.hypot(A.re[4 * p + q], A.im[4 * p + q]);
+      if (off < 1e-15) break;
+      for (let p = 0; p < 4; p++) for (let q = p + 1; q < 4; q++) {
+        const ar = A.re[4 * p + q], ai = A.im[4 * p + q], r = Math.hypot(ar, ai);
+        if (r < 1e-18) continue;
+        const ph = Math.atan2(ai, ar), app = A.re[5 * p], aqq = A.re[5 * q];
+        const z = (aqq - app) / (2 * r), t = (z >= 0 ? 1 : -1) / (Math.abs(z) + Math.sqrt(1 + z * z));
+        const c = 1 / Math.sqrt(1 + t * t), s = t * c;
+        const J = cm(); for (let i = 0; i < 4; i++) J.re[5 * i] = 1;
+        J.re[5 * p] = c; J.re[4 * p + q] = s;
+        J.re[4 * q + p] = -s * Math.cos(ph); J.im[4 * q + p] = s * Math.sin(ph);
+        J.re[5 * q] = c * Math.cos(ph); J.im[5 * q] = -c * Math.sin(ph);
+        A = cmul(cmul(cadj(J), A), J); V = cmul(V, J);
+      }
+    }
+    return { w: [0, 1, 2, 3].map(i => A.re[5 * i]), V };
+  }
+
+  /* ---------- πιθανότητες Born σε βάση ανάγνωσης ---------- */
+  const s2 = Math.SQRT1_2;
+  const ROT = {
+    Z: m2([1, 0, 0, 1]),
+    X: m2([s2, s2, s2, -s2]),                          // H
+    Y: m2([s2, 0, s2, 0], [0, -s2, 0, s2])             // H·S†
+  };
+  function probs(rho, basis) {
+    const V = kron2(ROT[basis] || ROT.Z, ROT[basis] || ROT.Z);
+    const r = cmul(cmul(V, rho), cadj(V));
+    const p = [0, 1, 2, 3].map(i => Math.max(0, r.re[5 * i]));
+    const s = p.reduce((a, b) => a + b, 0) || 1;
+    return p.map(x => x / s); // σειρά: 00, 01, 10, 11
+  }
+
+  /* ---------- παράμετροι: φυσικές μονάδες + χρονική διαστολή S ----------
+     ακουστικός χρόνος = S · φυσικός χρόνος ·  ακουστική συχνότητα = φυσική / S */
+  function toAudio(ph) {
+    const S = ph.S;
+    let T2 = ph.T2, T2s = Math.min(ph.T2s, ph.T2), T1 = Math.max(ph.T1, ph.T2 / 2);
+    return { J: ph.J / S, nu: [ph.nu0 / S, ph.nu1 / S], T2: T2 * S, T2s: T2s * S, T1: T1 * S, tau: ph.tau * S, echo: !!ph.echo };
+  }
+
+  /* ---------- τοπικό σήμα FID του σπιν q (ακουστικός χρόνος t) ----------
+     s_q(t) = 2 Σ_b c_b · e^{i2π f_b t_eff} · e^{−t/T2} · e^{−|t_eff|(1/T2* − 1/T2)}
+     f_b = ν_q + J(½ − b).  Με echo (επιλεκτικός π στο σπιν q τη στιγμή τ):
+     για t > τ: c_b → c_b*, t_eff = t − 2τ  (επανεστίαση ν, J και στατικών offsets). */
+  function signalAt(prep, A, q, t) {
+    const coh = prep.coh[q];
+    const after = A.echo && t > A.tau;
+    const teff = after ? t - 2 * A.tau : t;
+    const inh = Math.max(0, 1 / A.T2s - 1 / A.T2);
+    const dec = Math.exp(-t / A.T2) * Math.exp(-Math.abs(teff) * inh);
+    let re = 0, im = 0;
+    for (let b = 0; b < 2; b++) {
+      const f = A.nu[q] + A.J * (0.5 - b);
+      const cr = coh[b].re, ci = after ? -coh[b].im : coh[b].im;
+      const ph = TAU * f * teff, co = Math.cos(ph), si = Math.sin(ph);
+      re += 2 * (cr * co - ci * si); im += 2 * (cr * si + ci * co);
+    }
+    return { re: re * dec, im: im * dec };
+  }
+  /* πληθυσμός |1⟩ του σπιν q: T1 προς ισορροπία p_eq = 0· ο π παλμός τον αντιστρέφει */
+  function populationAt(prep, A, q, t) {
+    const p0 = prep.pop1[q];
+    if (!(A.echo && t > A.tau) || q !== 0) return p0 * Math.exp(-t / A.T1);
+    const pTau = 1 - p0 * Math.exp(-A.tau / A.T1);
+    return pTau * Math.exp(-(t - A.tau) / A.T1);
+  }
+
+  /* ---------- φίλτρο σκάλας 4 πόλων, μηδενικής καθυστέρησης ανάδρασης ----------
+     Αναλογικό πρότυπο: H(s) = 1 / [(1 + s/ω_c)^4 + k].
+     Ψηφιακά: 4 βαθμίδες TPT (Zavalishin), g = tan(π f_c / f_s), λύση της ανάδρασης σε κλειστή μορφή.
+     sat = true: κορεσμός tanh στην είσοδο (μη γραμμικός «αναλογικός» χαρακτήρας). */
+  function Ladder(fs) { this.fs = fs; this.s = [0, 0, 0, 0]; }
+  Ladder.prototype.process = function (x, fc, k, sat) {
+    const g = Math.tan(Math.PI * Math.min(fc, 0.45 * this.fs) / this.fs);
+    const G = g / (1 + g), B = 1 / (1 + g), s = this.s;
+    const Sig = G * G * G * B * s[0] + G * G * B * s[1] + G * B * s[2] + B * s[3];
+    const G4 = G * G * G * G;
+    const y4est = (G4 * x + Sig) / (1 + k * G4);
+    let u = x - k * y4est;
+    if (sat) u = Math.tanh(u);
+    let inp = u;
+    for (let i = 0; i < 4; i++) {
+      const v = (inp - s[i]) * G, y = v + s[i];
+      s[i] = y + v; inp = y;
+    }
+    return inp;
+  };
+
+  /* ---------- ψευδοτυχαία γεννήτρια (κλασική, με seed — όπως στο Studio) ---------- */
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  /* ---------- κουρδίσματα ---------- */
+  const A4 = 435;
+  const midiHz = (m) => A4 * Math.pow(2, (m - 69) / 12);
+  const studieHz = (n) => 100 * Math.pow(5, n / 25);       // κλίμακα Studie II: 81 βήματα, λόγος 5^(1/25)
+  const STUDIE_CENTS = 1200 * Math.log2(5) / 25;
+
+  /* ---------- φωνή σπιν: FID → φέρον → φίλτρο σκάλας ----------
+     opt: {freq, dur, prep, A, q, bright (οκτάβες), kKnob, gain, sat, exciter}
+     cutoff f_c(t) = freq · 2^{bright·|s(t)|} · resonance k = kKnob(1−C) + 4,3·C (δηλωμένη αντιστοίχιση) */
+  function renderSpinVoice(o, fs) {
+    const n = Math.max(1, Math.round(o.dur * fs));
+    const out = new Float32Array(n), lad = new Ladder(fs);
+    const k = o.kKnob * (1 - o.prep.C) + 4.3 * o.prep.C;
+    const att = 0.005, rel = Math.min(0.02, o.dur / 3);
+    for (let i = 0; i < n; i++) {
+      const t = i / fs;
+      const s = signalAt(o.prep, o.A, o.q || 0, t);
+      const r = Math.min(1, Math.hypot(s.re, s.im));
+      const ph = TAU * o.freq * t;
+      let x = s.re * Math.cos(ph) - s.im * Math.sin(ph);          // Re[s · e^{i2πf t}]
+      if (o.exciter && i < 24) x += o.exciter * (1 - i / 24);     // σύντομο κλασικό «χτύπημα» του φίλτρου
+      const fc = o.freq * Math.pow(2, o.bright * r);
+      let y = o.filter === false ? x : lad.process(x * (o.drive || 1), fc, k, o.sat !== false);
+      const env = Math.min(1, t / att, (o.dur - t) / rel);
+      out[i] = y * env * o.gain;
+    }
+    return out;
+  }
+  /* φωνή πληθυσμού (T1): ημιτονικό drone με πλάτος p(1)(t) — ανάλογο του «Excitation decay» */
+  function renderPopVoice(o, fs) {
+    const n = Math.round(o.dur * fs), out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / fs, p = populationAt(o.prep, o.A, 0, t);
+      const env = Math.min(1, t / 0.05, (o.dur - t) / 0.2);
+      out[i] = o.gain * p * Math.sin(TAU * o.freq * t) * env;
+    }
+    return out;
+  }
+  /* μίγμα ημιτόνων (Studie II): μερικές συχνότητες της κλίμακας, βάρη από πιθανότητες Born,
+     περιβάλλουσα = |s(t)| του σπιν (η φυσική ορίζει το σβήσιμο) */
+  function renderMixture(o, fs) {
+    const n = Math.round(o.dur * fs), out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / fs; const s = signalAt(o.prep, o.A, 0, t);
+      const r = Math.hypot(s.re, s.im);
+      let y = 0; for (let k = 0; k < o.freqs.length; k++) y += o.weights[k] * Math.sin(TAU * o.freqs[k] * t + k);
+      const env = Math.min(1, t / 0.01, (o.dur - t) / 0.05);
+      out[i] = o.gain * r * y * env;
+    }
+    return out;
+  }
+  /* κλασικά κρουστά (δεν είναι κβαντικά — δηλώνεται στη σελίδα) */
+  function renderKick(o, fs) {
+    const dur = 0.32, n = Math.round(dur * fs), out = new Float32Array(n); let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / fs, f = 46 + 120 * Math.exp(-t / 0.032); ph += TAU * f / fs;
+      const a = Math.exp(-t / 0.22) * Math.min(1, t / 0.0015);
+      out[i] = o.gain * Math.tanh(1.6 * Math.sin(ph)) * a * Math.min(1, (dur - t) / 0.02);
+    }
+    return out;
+  }
+  function renderHat(o, fs) {
+    const dur = 0.06, n = Math.round(dur * fs), out = new Float32Array(n), rnd = mulberry32(o.seed || 7); let prev = 0;
+    for (let i = 0; i < n; i++) { const w = rnd() * 2 - 1, hp = w - prev; prev = w; out[i] = o.gain * hp * Math.exp(-(i / fs) / 0.014); }
+    return out;
+  }
+  /* εισαγωγή εξαγωγής FID του Quantum Music Studio (μορφή pundora-fid-v3) */
+  function parseStudioFID(json) {
+    const d = typeof json === 'string' ? JSON.parse(json) : json;
+    if (!d || !/^pundora-fid/.test(d.format || '') || !Array.isArray(d.timeMs)) throw new Error('not-fid');
+    return { tMs: d.timeMs, q: [[d.q0Re, d.q0Im], [d.q1Re, d.q1Im]], windowMs: d.physicalWindowMs || d.timeMs[d.timeMs.length - 1], source: d.source || '', carrierHz: d.carrierHz || [] };
+  }
+  function fidAt(F, q, tMs) {
+    const T = F.tMs, n = T.length; if (tMs <= T[0]) return { re: F.q[q][0][0], im: F.q[q][1][0] };
+    if (tMs >= T[n - 1]) return { re: 0, im: 0 };
+    let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= tMs) lo = m; else hi = m; }
+    const w = (tMs - T[lo]) / (T[hi] - T[lo]);
+    return { re: F.q[q][0][lo] * (1 - w) + F.q[q][0][hi] * w, im: F.q[q][1][lo] * (1 - w) + F.q[q][1][hi] * w };
+  }
+  /* φωνή από αρχείο: u ακουστικός χρόνος, φυσικός t = u·W/D (εξ. 4.61–4.62 της εργασίας) */
+  function renderFidVoice(o, fs) {
+    const n = Math.round(o.dur * fs), out = new Float32Array(n), lad = new Ladder(fs);
+    const stretch = o.F.windowMs / (o.dur * 1000);
+    for (let i = 0; i < n; i++) {
+      const u = i / fs, s = fidAt(o.F, o.q || 0, u * 1000 * stretch);
+      const r = Math.min(1, Math.hypot(s.re, s.im)), ph = TAU * o.freq * u;
+      const x = s.re * Math.cos(ph) - s.im * Math.sin(ph);
+      const y = lad.process(x, o.freq * Math.pow(2, o.bright * r), o.kKnob, true);
+      out[i] = o.gain * y * Math.min(1, u / 0.005, (o.dur - u) / 0.02);
+    }
+    return out;
+  }
+
+  /* ---------- αλληλουχητής psytrance ----------
+     Μπάσο: ίδια φυσική χαλάρωσης, αλλά πάντα χωρίς πύλη σύνδεσης (e = 0), ώστε να μη σβήνει. */
+  const OUTCOME_SEMIS = [0, 6, -6, 12];   // 00 → θεμέλιο, 01/10 → τρίτονο (διαφωνία), 11 → οκτάβα (συμφωνία)
+  const PATTERNS = {
+    rolling: { kick: '1000100010001000', bass: '0111011101110111', hat: '0010001000100010', lead: '1011101011011010' },
+    gallop:  { kick: '1000100010001000', bass: '0110011001100110', hat: '0010001000100010', lead: '1010101010101011' },
+    half:    { kick: '1000000010000000', bass: '0111011101110111', hat: '0010001000100010', lead: '1000100110001010' },
+    none:    { kick: '0000000000000000', bass: '0000000000000000', hat: '0000000000000000', lead: '1010101010101010' },
+    riser:   { kick: '0000000000000000', bass: '0000000000000000', hat: '1111111111111111', lead: '1000000010000000' }
+  };
+  function defaults() {
+    return {
+      phys: { J: 4, nu0: 0, nu1: 0, T2: 0.4, T2s: 0.05, T1: 1.2, tau: 0.05, echo: false, S: 1 },
+      e: 0, p: 0.25, basis: 'Z',
+      bpm: 145, rootMidi: 28 /* E1 στο A4=435 */, pattern: 'rolling', density: 0.8, seed: 271828,
+      leadOct: 3, bright: 3.5, kKnob: 2.6, bassBright: 2.2,
+      mix: { kick: 0.9, bass: 0.6, hat: 0.14, lead: 0.32 }, tuning: 'tet', echoSync: 0
+    };
+  }
+  function stepSeconds(bpm) { return 60 / bpm / 4; }
+  /* εφαρμογή «echo sync»: 2τ (ακουστικό) = n δέκατα έκτα */
+  function syncedPhys(cfg) {
+    const ph = Object.assign({}, cfg.phys);
+    if (cfg.echoSync > 0) { ph.echo = true; ph.tau = cfg.echoSync * stepSeconds(cfg.bpm) / 2 / ph.S; }
+    return ph;
+  }
+  function leadFreq(cfg, semis) {
+    if (cfg.tuning === 'studie') {
+      const base = Math.round(25 * Math.log(midiHz(cfg.rootMidi + 12 * cfg.leadOct) / 100) / Math.log(5));
+      const steps = Math.round(semis * 100 / STUDIE_CENTS);
+      return studieHz(Math.max(0, Math.min(80, base + steps)));
+    }
+    return midiHz(cfg.rootMidi + 12 * cfg.leadOct + semis);
+  }
+  /* επιστρέφει τα γεγονότα ενός βήματος (16ου) */
+  function stepEvents(cfg, prep, step, t0, rng, fidF, prepBass) {
+    const pat = PATTERNS[cfg.pattern] || PATTERNS.rolling, i = step % 16, st = stepSeconds(cfg.bpm);
+    const ph = syncedPhys(cfg), A = toAudio(ph), ev = [];
+    if (pat.kick[i] === '1') ev.push({ t: t0, kind: 'kick', gain: cfg.mix.kick });
+    if (pat.hat[i] === '1') ev.push({ t: t0, kind: 'hat', gain: cfg.mix.hat, seed: step + 1 });
+    if (pat.bass[i] === '1') ev.push({ t: t0, kind: 'spin', freq: midiHz(cfg.rootMidi), dur: st * 0.92, prep: prepBass || prepare(0, cfg.p), A, q: 0, bright: cfg.bassBright, kKnob: 1.2, gain: cfg.mix.bass, exciter: 0, drive: 1.4 });
+    if (pat.lead[i] === '1' && rng() < cfg.density) {
+      const P = probs(prep.rho, cfg.basis); let u = rng(), o = 0; while (o < 3 && u > P[o]) { u -= P[o]; o++; }
+      const dur = Math.min(2.5, Math.max(st * (cfg.hold || 2), A.echo ? 2 * A.tau + 3 * A.T2s : 0));
+      const base = { t: t0, freq: leadFreq(cfg, OUTCOME_SEMIS[o]), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: cfg.mix.lead, outcome: o, pan: (o === 1 ? -0.4 : o === 2 ? 0.4 : 0) };
+      ev.push(fidF ? Object.assign(base, { kind: 'fid', F: fidF, q: 0 }) : Object.assign(base, { kind: 'spin', prep, A, q: 0, exciter: 0.35 }));
+    }
+    return ev;
+  }
+  function renderEvent(ev, fs) {
+    switch (ev.kind) {
+      case 'kick': return renderKick(ev, fs);
+      case 'hat': return renderHat(ev, fs);
+      case 'spin': return renderSpinVoice(ev, fs);
+      case 'pop': return renderPopVoice(ev, fs);
+      case 'mix': return renderMixture(ev, fs);
+      case 'fid': return renderFidVoice(ev, fs);
+    }
+    return new Float32Array(1);
+  }
+  /* απόδοση χρονολογίου σε στερεοφωνικό buffer, με ήπιο περιοριστή tanh */
+  function renderTimeline(events, total, fs, onProgress) {
+    const n = Math.ceil(total * fs), L = new Float32Array(n), R = new Float32Array(n);
+    events.forEach((ev, idx) => {
+      const buf = renderEvent(ev, fs), off = Math.round(ev.t * fs), pan = ev.pan || 0;
+      const gl = Math.cos((pan + 1) * Math.PI / 4) * Math.SQRT2, gr = Math.sin((pan + 1) * Math.PI / 4) * Math.SQRT2;
+      const ch = ev.channel; // 'L' / 'R' για τη στερεοφωνική διάταξη q0/q1
+      for (let i = 0; i < buf.length && off + i < n; i++) {
+        if (off + i < 0) continue;
+        if (ch === 'L') L[off + i] += buf[i]; else if (ch === 'R') R[off + i] += buf[i];
+        else { L[off + i] += buf[i] * gl; R[off + i] += buf[i] * gr; }
+      }
+      if (onProgress && idx % 64 === 0) onProgress(idx / events.length);
+    });
+    for (let i = 0; i < n; i++) { L[i] = Math.tanh(L[i] * 0.9); R[i] = Math.tanh(R[i] * 0.9); }
+    return [L, R];
+  }
+  function grooveEvents(cfg, bars, t0, fidF) {
+    const prep = prepare(cfg.e, cfg.p), prepBass = prepare(0, cfg.p), rng = mulberry32(cfg.seed), st = stepSeconds(cfg.bpm), ev = [];
+    for (let s = 0; s < bars * 16; s++) ev.push(...stepEvents(cfg, prep, s, (t0 || 0) + s * st, rng, fidF, prepBass));
+    return ev;
+  }
+
+  /* ---------- «Δύο σπιν, πέντε στιγμές» — σύνθεση σε μορφή στιγμών ----------
+     Ι   Μίγματα ημιτόνων στην κλίμακα Studie II, βάρη Born, σβήσιμο από T2*
+     ΙΙ  Ελεύθερη επαγωγική απόσβεση: το T2* μικραίνει σταδιακά
+     ΙΙΙ Ηχώ spin: ο ήχος επιστρέφει στο 2τ χωρίς νέο χτύπημα
+     IV  Συνέχεια ρυθμού–τόνου: η διαστολή S πέφτει, οι διακροτήματα J γίνονται δύο τόνοι
+     V   Σιωπή Bell: η εμπλοκή σβήνει το τοπικό σήμα· μένει το φίλτρο που αυτοταλαντώνεται — και drop */
+  function pieceEvents(seed) {
+    const ev = [], rng = mulberry32(seed || 1954), marks = [];
+    const base = defaults();
+    // Ι — 0…40 s
+    marks.push({ t: 0, id: 1 });
+    for (let t = 0.5; t < 39; ) {
+      const e = 0.5 * rng(), prep = prepare(e, 0), P = probs(prep.rho, rng() < 0.5 ? 'Z' : 'X');
+      const n0 = 10 + Math.floor(rng() * 40), d = 1 + Math.floor(rng() * 4);
+      const A = toAudio({ J: 0, nu0: 0, nu1: 0, T2: 6, T2s: 0.6 + 2.4 * rng(), T1: 8, tau: 1, echo: false, S: 1 });
+      const dur = Math.min(6, 4 * A.T2s);
+      ev.push({ t, kind: 'mix', dur, prep, A, freqs: [0, 1, 2, 3].map(k => studieHz(Math.min(80, n0 + d * k))), weights: P.map(x => Math.sqrt(x)), gain: 0.28, pan: rng() * 1.4 - 0.7 });
+      t += 0.8 + 2.6 * rng();
+    }
+    // ΙΙ — 40…80 s : μεμονωμένα «νύγματα» σπιν, T2* από 1,2 s σε 0,03 s
+    marks.push({ t: 40, id: 2 });
+    for (let t = 40, k = 0; t < 79; k++) {
+      const frac = (t - 40) / 39, T2s = 1.2 * Math.pow(0.03 / 1.2, frac);
+      const A = toAudio({ J: 2.5, nu0: 0, nu1: 0, T2: 1.5, T2s, T1: 3, tau: 1, echo: false, S: 1 });
+      const prep = prepare(0, 0.5);
+      ev.push({ t, kind: 'spin', freq: midiHz(40 + [0, 7, 12, 1][k % 4]), dur: Math.min(3.5, 5 * T2s + 0.05), prep, A, q: 0, bright: 3, kKnob: 2.2, gain: 0.85, exciter: 0, pan: (k % 2 ? 0.3 : -0.3) });
+      t += Math.max(0.25, 2.6 * (1 - frac) + 0.25);
+    }
+    // ΙΙΙ — 80…120 s : ηχώ — το χτύπημα σβήνει, επιστρέφει στο 2τ· τ μικραίνει ώσπου η ηχώ «κλειδώνει» στο beat
+    marks.push({ t: 80, id: 3 });
+    for (let t = 80, k = 0; t < 119; k++) {
+      const frac = (t - 80) / 39, tau = 0.9 * (1 - frac) + 0.2069 * frac; // στο τέλος 2τ = 1 beat στα 145 BPM
+      const A = toAudio({ J: 0, nu0: 0, nu1: 0, T2: 3, T2s: 0.06, T1: 6, tau, echo: true, S: 1 });
+      ev.push({ t, kind: 'spin', freq: midiHz(52 + [0, 0, 7, -5][k % 4]), dur: 2 * tau + 0.4, prep: prepare(0, 0), A, q: 0, bright: 3.5, kKnob: 2.8, gain: 0.6, exciter: 0 });
+      ev.push({ t, kind: 'pop', freq: midiHz(28), dur: 2 * tau + 0.6, prep: prepare(0, 0), A, gain: 0.26 });
+      t += 2 * tau + 0.6 * (1 - frac) + 0.2;
+    }
+    // IV — 120…160 s : J = 150 Hz σταθερό, η διαστολή S πέφτει από 150 σε 0,75 (ρυθμός → τόνος)
+    marks.push({ t: 120, id: 4 });
+    const segs = 80;
+    for (let k = 0; k < segs; k++) {
+      const t = 120 + k * 0.5, S = 150 * Math.pow(0.75 / 150, k / (segs - 1));
+      const A = toAudio({ J: 150, nu0: 0, nu1: 0, T2: 400, T2s: 400, T1: 800, tau: 1, echo: false, S });
+      ev.push({ t, kind: 'spin', freq: midiHz(45), dur: 0.52, prep: prepare(0, 0.5), A, q: 0, bright: 0, kKnob: 0, gain: 0.3, exciter: 0, filter: false, sat: false, Sval: S });
+    }
+    // V — 160…190 s : η εμπλοκή ανεβαίνει 0 → 1 (το κανάλι q0 αριστερά, q1 δεξιά)
+    marks.push({ t: 160, id: 5 });
+    for (let k = 0; k < 60; k++) {
+      const t = 160 + k * 0.5, e = Math.min(1, k / 44);
+      const prep = prepare(e, 0);
+      const A = toAudio({ J: 0, nu0: 0, nu1: 0, T2: 2, T2s: 0.35, T1: 4, tau: 1, echo: false, S: 1 });
+      const f = midiHz(52 + (k % 8 < 4 ? 0 : 12));
+      if (k >= 52) continue;   // 4 s πραγματικής σιωπής πριν το drop
+      ev.push({ t, kind: 'spin', freq: f, dur: 0.5, prep, A, q: 0, bright: 2.5, kKnob: 2.4, gain: 0.55, exciter: 0.35, channel: 'L', e });
+      ev.push({ t, kind: 'spin', freq: f * 1.5, dur: 0.5, prep, A, q: 1, bright: 2.5, kKnob: 2.4, gain: 0.55, exciter: 0.35, channel: 'R', e });
+    }
+    // drop — 190…243 s : το groove με σύμπλεξη στο μέγιστο, μετά λύση
+    marks.push({ t: 190, id: 6 });
+    const cfg = defaults(); cfg.e = 1; cfg.echoSync = 2; cfg.seed = seed || 1954;
+    const st = stepSeconds(cfg.bpm), barsA = 16, barsB = 16;
+    ev.push(...grooveEvents(cfg, barsA, 190));
+    const cfgB = Object.assign({}, cfg, { e: 0.35, basis: 'X', seed: (seed || 1954) + 1 });
+    ev.push(...grooveEvents(cfgB, barsB, 190 + barsA * 16 * st));
+    const end = 190 + (barsA + barsB) * 16 * st + 1.5;
+    return { events: ev, total: end, marks };
+  }
+
+  /* ---------- WAV 16-bit ---------- */
+  function wav(L, R, fs) {
+    const n = L.length, buf = new ArrayBuffer(44 + n * 4), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 4, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, fs, true); v.setUint32(28, fs * 4, true);
+    v.setUint16(32, 4, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 4, true);
+    for (let i = 0, o = 44; i < n; i++, o += 4) {
+      v.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 32767, true);
+      v.setInt16(o + 2, Math.max(-1, Math.min(1, R[i])) * 32767, true);
+    }
+    return buf;
+  }
+
+  const api = { prepare, describe, concurrence, probs, toAudio, signalAt, populationAt, Ladder, mulberry32, midiHz, studieHz, STUDIE_CENTS, A4,
+    renderSpinVoice, renderPopVoice, renderMixture, renderKick, renderHat, renderFidVoice, parseStudioFID, fidAt,
+    PATTERNS, OUTCOME_SEMIS, defaults, stepSeconds, syncedPhys, stepEvents, renderEvent, renderTimeline, grooveEvents, pieceEvents, wav };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.QSynth = api;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+(() => {
+'use strict';
+const Q = window.QSynth;
+const VERIFY = [
+ {
+  "name": "B1 |s(T2*)| = 1/e",
+  "expected": 0.36787944117144233,
+  "got": 0.36787944117144233,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B2a θέση μεγίστου ηχούς (s)",
+  "expected": 0.06,
+  "got": 0.060000000000008755,
+  "dev": 8.756884106730922e-15,
+  "ok": true
+ },
+ {
+  "name": "B2b ύψος ηχούς",
+  "expected": 0.8607079764250578,
+  "got": 0.8607079764235503,
+  "dev": 1.5074608228360376e-12,
+  "ok": true
+ },
+ {
+  "name": "B2c σήμα λίγο πριν τον π (≈ e^{-τ/T2*})",
+  "expected": 0.0024787521766663585,
+  "got": 0.002479247976680043,
+  "dev": 4.958000136843013e-7,
+  "ok": true
+ },
+ {
+  "name": "B3 |s| στο 1/(2J) για S=150 (J_ήχου=1 Hz)",
+  "expected": 0,
+  "got": 6.123213584990797e-17,
+  "dev": 6.123213584990797e-17,
+  "ok": true
+ },
+ {
+  "name": "B3 |s| στο 1/(2J) για S=15 (J_ήχου=10 Hz)",
+  "expected": 0,
+  "got": 6.123213584990797e-17,
+  "dev": 6.123213584990797e-17,
+  "ok": true
+ },
+ {
+  "name": "B3c άνω φασματική γραμμή (Hz)",
+  "expected": 540,
+  "got": 540,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B3d κάτω φασματική γραμμή (Hz)",
+  "expected": 340,
+  "got": 340,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B3e λόγος έντασης στο f_c (κενό) / κορυφή",
+  "expected": 0,
+  "got": 0.0000020900440395762523,
+  "dev": 0.0000020900440395762523,
+  "ok": true
+ },
+ {
+  "name": "B4a |H(jω_c)| για k=0 (−12,04 dB)",
+  "expected": 0.25,
+  "got": 0.25000000000005224,
+  "dev": 5.2235993308613615e-14,
+  "ok": true
+ },
+ {
+  "name": "B4b k=4: πλάτος 0,8 s / 0,1 s (αυτοταλάντωση, = 1)",
+  "expected": 1,
+  "got": 0.999999999999975,
+  "dev": 2.4980018054066022e-14,
+  "ok": true
+ },
+ {
+  "name": "B4c k=3,9 σβήνει / k=4,1 αυξάνει",
+  "expected": "<1 / >1",
+  "got": "9.49e-13 / 3.01e+13",
+  "dev": "",
+  "ok": true
+ },
+ {
+  "name": "B4d (1+j)^4 (πραγματικό μέρος)",
+  "expected": -4,
+  "got": -4,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B5a βήμα (cents)",
+  "expected": 111.45,
+  "got": 111.45254855459338,
+  "dev": 0.0025485545933747744,
+  "ok": true
+ },
+ {
+  "name": "B5b f_80 (Hz)",
+  "expected": 17247,
+  "got": 17246.62076826519,
+  "dev": 0.3792317348088545,
+  "ok": true
+ },
+ {
+  "name": "B6a max |s_q| για Bell (q0 και q1)",
+  "expected": 0,
+  "got": 6.123233995736766e-17,
+  "dev": 6.123233995736766e-17,
+  "ok": true
+ },
+ {
+  "name": "B6b C(Bell)",
+  "expected": 1,
+  "got": 0.9999999999999996,
+  "dev": 4.440892098500626e-16,
+  "ok": true
+ },
+ {
+  "name": "B6c P(01)+P(10) Bell, βάση Z",
+  "expected": 0,
+  "got": 1.874699728327322e-33,
+  "dev": 1.874699728327322e-33,
+  "ok": true
+ },
+ {
+  "name": "B6d P(01)+P(10) Bell, βάση X",
+  "expected": 0,
+  "got": 0,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B7a max |M⊥² + C² − 1| (καθαρός σύντροφος)",
+  "expected": 0,
+  "got": 1.9585329469329338e-8,
+  "dev": 1.9585329469329338e-8,
+  "ok": true
+ },
+ {
+  "name": "B7b max |C − (1−2p)·sin(πe/2)|",
+  "expected": 0,
+  "got": 1.2822763628683731e-8,
+  "dev": 1.2822763628683731e-8,
+  "ok": true
+ },
+ {
+  "name": "B8 p(τ⁺) = 1 − p(τ⁻)",
+  "expected": 0.5906346230516437,
+  "got": 0.5906346228703745,
+  "dev": 1.8126922185501826e-10,
+  "ok": true
+ },
+ {
+  "name": "B9 T2*_ήχου για S=20 (s)",
+  "expected": 1,
+  "got": 1,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B10a C4 στο A4=435 (Hz, ρίζα του Studio)",
+  "expected": 258.6525475130918,
+  "got": 258.6525475130918,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B10b εισαγωγή pundora-fid-v3: q0(0)",
+  "expected": 1,
+  "got": 1,
+  "dev": 0,
+  "ok": true
+ },
+ {
+  "name": "B10c απόδοση εισαγόμενου FID (κορυφή, πεπερασμένη)",
+  "expected": "0 < x < 1",
+  "got": "0.244",
+  "dev": "",
+  "ok": true
+ },
+ {
+  "name": "B11 ίδιο seed → ίδια γεγονότα",
+  "expected": "ίδια",
+  "got": "ίδια",
+  "dev": "",
+  "ok": true
+ },
+ {
+  "name": "B11b Bell: η μελωδία χρησιμοποιεί μόνο 00/11 (θεμέλιο/οκτάβα)",
+  "expected": "0,3",
+  "got": "0,3",
+  "dev": "",
+  "ok": true
+ },
+ {
+  "name": "B12 2τ_ήχου με sync=2 στα 145 BPM (s)",
+  "expected": 0.20689655172413793,
+  "got": 0.20689655172413793,
+  "dev": 0,
+  "ok": true
+ }
+];
+const OFFLINE = true;
+
+/* ================= γλώσσα ================= */
+const EN = {
+  tagline: 'Two nuclear spins, one ladder filter, 145 BPM', play: 'Play', lessonBtn: 'Lesson', stopLive: 'Stop', fullscreen: 'Fullscreen', scenes: 'Scenes',
+  mSpin: 'Spin', mSpinS: 'how it fades and how it beats', mEcho: 'Spin echo', mEchoS: 'π pulse at time τ', echoOn: 'Echo', sync: 'Sync 2τ', free: 'free',
+  mLink: 'Link', mLinkS: 'CNOT gate and partner temperature', basis: 'Readout basis', mLad: 'Ladder filter', mLadS: '4 poles, −24 dB/octave',
+  mGroove: 'Groove', mGrooveS: 'the Born rule picks the notes', pattern: 'Pattern', noDrums: 'no drums', root: 'Key', tuning: 'Tuning', tet: '12-TET, A4 = 435 Hz',
+  mMix: 'Mix', mMixS: 'kick and hat: classical',
+  h1t: 'The sound is a spinning spin', h1: 'Every note is a nucleus’ magnetisation precessing and fading (FID). The fade is not an ADSR: T2 and T2* set it.',
+  h2t: 'The sound that comes back', h2: 'With the echo on, the sound fades and returns at 2τ with no new trigger. The T2* fade was dephasing, not lost energy.',
+  h3t: 'Rhythm or pitch?', h3: 'J coupling splits the line in two. Slow, you hear a pulse; fast, two notes. Same phenomenon, different speed.',
+  h4t: 'The silence of entanglement', h4: 'The CNOT moves the coherence into two-spin correlations and the local signal goes silent. Only with a cold partner is the state truly entangled, and then the filter sings.',
+  pieceT: 'Two Spins, Five Moments', pieceS: 'A piece in moment form, inspired by Stockhausen · 4 minutes', piecePlay: 'Render and play', stop: 'Stop', saveWav: 'Save WAV',
+  tLoop: 'Loop for DJs', tLoopN: 'Renders the current settings to sample-accurate bars, with BPM and key in the file name.', bars: 'Bars', saveLoop: 'Save loop',
+  tFid: 'FID from the Studio', tFidN: 'Load an FID export (JSON) from Quantum Music Studio. The lead will play that signal, stretched to each note’s length.', clear: 'Clear',
+  tMidiN: 'Keyboard notes play the lead (A4 = 435 Hz). CC 1–8 drive link, partner, T2*, J, τ, brightness, resonance, stretch. Learn: press it, click a knob, move a controller.',
+  midiConnect: 'Connect MIDI', midiLearn: 'Learn',
+  hood: 'Under the hood: model, mappings, checks', hModel: 'The physics model',
+  hModelP: 'Model and conventions (A4 = 435 Hz, q0 left / q1 right, y = G·Re[s·e^{i2πf u}]) come from the NMR Lab of Quantum Music Studio. Simplifications: ideal pulses, Lorentzian inhomogeneity (so 1/T2* = 1/T2 + 1/T2′), selective π on the observed spin only, no receiver noise.',
+  hMap: 'What is physics and what is a design choice',
+  map1: 'Physics: each note’s shape and fade, the return at 2τ, the two J lines, the silence after the CNOT, the measurement probabilities.',
+  map2: 'Choice: filter cutoff follows |s(t)|, resonance follows C (k = k₀(1−C) + 4.3·C), outcomes 00/01/10/11 become root / tritone / tritone below / octave.',
+  map3: 'Classical: kick, hi-hat, tanh saturation, the small click that excites the filter, the seeded pseudo-random generator.',
+  map4: 'All sound is produced classically from a classical simulation. You are not hearing a quantum computer.',
+  hVer: 'Numerical checks of the model',
+  credit: 'Built on Quantum Music Studio by Panagiota (Giota) Brousali, diploma thesis, SEMFE NTUA. The piece is original, in the spirit of Stockhausen (the Studie II scale, the rhythm–pitch continuum, moment form), and reproduces none of his works.'
+};
+let lang = 'el'; const EL = {};
+document.querySelectorAll('[data-i18n]').forEach(n => { EL[n.dataset.i18n] = n.textContent; });
+const tr = k => (lang === 'en' ? EN[k] : EL[k]) || EN[k] || k;
+const num = (x, d) => { const s = x.toFixed(d); return lang === 'el' ? s.replace('.', ',') : s; };
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(n => { const v = lang === 'en' ? EN[n.dataset.i18n] : EL[n.dataset.i18n]; if (v) n.textContent = v; });
+  document.getElementById('lang-el').setAttribute('aria-pressed', lang === 'el'); document.getElementById('lang-en').setAttribute('aria-pressed', lang === 'en');
+  knobs.forEach(k => k.relabel()); buildScenes(); buildTimeline(); updatePlayLabel(); readout(); buildVerify(); if (typeof renderLesson === 'function' && lesson.active) renderLesson();
+}
+
+/* ================= κατάσταση ================= */
+const cfg = Q.defaults();
+cfg.echoSync = 2;
+let prep = Q.prepare(cfg.e, cfg.p), prepBass = Q.prepare(0, cfg.p);
+let fidF = null;
+const refreshPrep = () => { prep = Q.prepare(cfg.e, cfg.p); prepBass = Q.prepare(0, cfg.p); };
+
+/* ================= κουμπιά (knobs) ================= */
+const KDEF = {
+  T2s: { el: 'T2*', en: 'T2*', min: 0.004, max: 1, log: true, get: () => cfg.phys.T2s, set: v => { cfg.phys.T2s = Math.min(v, cfg.phys.T2); }, fmt: v => ms(v) },
+  T2: { el: 'T2', en: 'T2', min: 0.05, max: 4, log: true, get: () => cfg.phys.T2, set: v => { cfg.phys.T2 = v; cfg.phys.T2s = Math.min(cfg.phys.T2s, v); cfg.phys.T1 = Math.max(cfg.phys.T1, v / 2); }, fmt: v => ms(v) },
+  J: { el: 'J', en: 'J', min: 0, max: 300, curve: 2.2, get: () => cfg.phys.J, set: v => { cfg.phys.J = v; }, fmt: v => num(v, v < 10 ? 1 : 0) + ' Hz' },
+  S: { el: 'Διαστολή', en: 'Stretch', min: 0.25, max: 200, log: true, get: () => cfg.phys.S, set: v => { cfg.phys.S = v; }, fmt: v => '×' + num(v, v < 10 ? 2 : 0) },
+  tau: { el: 'τ', en: 'τ', min: 0.002, max: 0.5, log: true, get: () => cfg.phys.tau, set: v => { cfg.phys.tau = v; }, fmt: v => ms(v) },
+  e: { el: 'CNOT', en: 'CNOT', min: 0, max: 1, get: () => cfg.e, set: v => { cfg.e = v; refreshPrep(); }, fmt: v => num(v * 180, 0) + '°' },
+  p: { el: 'Θερμός γείτονας', en: 'Warm partner', min: 0, max: 0.5, get: () => cfg.p, set: v => { cfg.p = v; refreshPrep(); }, fmt: v => 'p = ' + num(v, 2) },
+  bright: { el: 'Lead φως', en: 'Lead bright', min: 0, max: 6, get: () => cfg.bright, set: v => { cfg.bright = v; }, fmt: v => num(v, 1) + ' oct' },
+  kKnob: { el: 'Συντονισμός', en: 'Resonance', min: 0, max: 3.9, get: () => cfg.kKnob, set: v => { cfg.kKnob = v; }, fmt: v => 'k = ' + num(v, 2) },
+  bassBright: { el: 'Μπάσο φως', en: 'Bass bright', min: 0, max: 5, get: () => cfg.bassBright, set: v => { cfg.bassBright = v; }, fmt: v => num(v, 1) + ' oct' },
+  density: { el: 'Πυκνότητα', en: 'Density', min: 0, max: 1, get: () => cfg.density, set: v => { cfg.density = v; }, fmt: v => num(v * 100, 0) + '%' },
+  leadOct: { el: 'Οκτάβα lead', en: 'Lead octave', min: 1, max: 4, step: 1, get: () => cfg.leadOct, set: v => { cfg.leadOct = Math.round(v); }, fmt: v => '+' + Math.round(v) },
+  mkick: { el: 'Kick', en: 'Kick', min: 0, max: 1.2, get: () => cfg.mix.kick, set: v => { cfg.mix.kick = v; }, fmt: v => num(v, 2) },
+  mbass: { el: 'Μπάσο', en: 'Bass', min: 0, max: 1.2, get: () => cfg.mix.bass, set: v => { cfg.mix.bass = v; }, fmt: v => num(v, 2) },
+  mhat: { el: 'Hat', en: 'Hat', min: 0, max: 0.5, get: () => cfg.mix.hat, set: v => { cfg.mix.hat = v; }, fmt: v => num(v, 2) },
+  mlead: { el: 'Lead', en: 'Lead', min: 0, max: 1, get: () => cfg.mix.lead, set: v => { cfg.mix.lead = v; }, fmt: v => num(v, 2) }
+};
+function ms(v) { return v < 1 ? num(v * 1000, v < 0.01 ? 1 : 0) + ' ms' : num(v, 2) + ' s'; }
+const knobs = new Map();
+let learnArmed = false, learnTarget = null;
+function makeKnob(host) {
+  const key = host.dataset.k, d = KDEF[key];
+  const id = 'k-' + key;
+  host.innerHTML = `<svg viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="21" fill="var(--panel-2)" stroke="var(--line)" stroke-width="1.5"/><path class="trk" fill="none" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/><path class="val" fill="none" stroke="var(--ch1)" stroke-width="4" stroke-linecap="round"/><line class="ptr" x1="28" y1="28" x2="28" y2="12" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"/></svg><input type="range" id="${id}" min="0" max="1000" step="1"><span class="kl"></span><span class="kv"></span>`;
+  const svg = host.querySelector('svg'), inp = host.querySelector('input'), kl = host.querySelector('.kl'), kv = host.querySelector('.kv');
+  const toN = v => d.log ? Math.log(v / d.min) / Math.log(d.max / d.min) : d.curve ? Math.pow((v - d.min) / (d.max - d.min), 1 / d.curve) : (v - d.min) / (d.max - d.min);
+  const fromN = n => { n = Math.max(0, Math.min(1, n)); let v = d.log ? d.min * Math.pow(d.max / d.min, n) : d.curve ? d.min + (d.max - d.min) * Math.pow(n, d.curve) : d.min + (d.max - d.min) * n; return d.step ? Math.round(v / d.step) * d.step : v; };
+  const arc = (a0, a1) => { const p = a => [28 + 21 * Math.cos(a), 28 + 21 * Math.sin(a)]; const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0} ${y0} A21 21 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`; };
+  const A0 = Math.PI * 0.75, SPAN = Math.PI * 1.5;
+  svg.querySelector('.trk').setAttribute('d', arc(A0, A0 + SPAN));
+  const def = d.get();
+  const k = {
+    key, d, n: toN(def), def, nOf: toN,
+    draw() { const a = A0 + SPAN * this.n; svg.querySelector('.val').setAttribute('d', this.n > 0.002 ? arc(A0, a) : ''); const ptr = svg.querySelector('.ptr'); ptr.setAttribute('x2', 28 + 16 * Math.cos(a)); ptr.setAttribute('y2', 28 + 16 * Math.sin(a)); const v = d.get(); kv.textContent = d.fmt(v); inp.value = Math.round(this.n * 1000); inp.setAttribute('aria-valuetext', d.fmt(v)); },
+    setN(n, quiet) { this.n = Math.max(0, Math.min(1, n)); d.set(fromN(this.n)); this.n = toN(d.get()); this.draw(); if (!quiet) changed(key); },
+    setV(v) { d.set(v); this.n = toN(d.get()); this.draw(); },
+    sync() { this.n = toN(d.get()); this.draw(); },
+    relabel() { kl.textContent = lang === 'en' ? d.en : d.el; inp.setAttribute('aria-label', kl.textContent); this.draw(); }
+  };
+  let y0 = 0, n0 = 0;
+  svg.addEventListener('pointerdown', ev => {
+    if (learnArmed) { learnTarget = key; knobs.forEach(o => o.host.classList.remove('learn')); host.classList.add('learn'); setMidiStatus((lang === 'en' ? 'Move a controller for ' : 'Κούνησε έναν ελεγκτή για ') + kl.textContent); return; }
+    svg.setPointerCapture(ev.pointerId); y0 = ev.clientY; n0 = k.n; inp.focus({ preventScroll: true }); ev.preventDefault();
+  });
+  svg.addEventListener('pointermove', ev => { if (!svg.hasPointerCapture(ev.pointerId)) return; k.setN(n0 + (y0 - ev.clientY) / (ev.shiftKey ? 600 : 160)); });
+  svg.addEventListener('dblclick', () => k.setV(k.def) || changed(key));
+  svg.addEventListener('wheel', ev => { ev.preventDefault(); k.setN(k.n - Math.sign(ev.deltaY) * 0.02); }, { passive: false });
+  inp.addEventListener('input', () => k.setN(inp.value / 1000));
+  k.host = host; knobs.set(key, k); k.relabel();
+}
+document.querySelectorAll('.knob').forEach(makeKnob);
+function syncAll() { knobs.forEach(k => k.sync()); document.getElementById('echo').setAttribute('aria-pressed', cfg.phys.echo || cfg.echoSync > 0); document.getElementById('sync').value = cfg.echoSync; document.querySelectorAll('#basis button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === cfg.basis)); document.getElementById('pattern').value = cfg.pattern; document.getElementById('root').value = cfg.rootMidi; document.getElementById('tuning').value = cfg.tuning; document.getElementById('seed').value = cfg.seed; document.getElementById('bpm').value = cfg.bpm; document.documentElement.style.setProperty('--bpm', cfg.bpm); readout(); }
+function changed(key) { takeover(); readout(); highlightHear(); }
+
+/* ================= σκηνές ================= */
+const SCENES = [
+  { el: 'Καθαρό σπιν', en: 'Clean spin', set: c => Object.assign(c, { e: 0, p: 0.25, echoSync: 0, basis: 'Z', bright: 3.2, kKnob: 2.4 }, { phys: Object.assign(c.phys, { echo: false, T2s: 0.05, T2: 0.4, J: 4, S: 1 }) }) },
+  { el: 'Ηχώ στο beat', en: 'Echo on the beat', set: c => Object.assign(c, { e: 0, p: 0.25, echoSync: 2, basis: 'Z', bright: 3.5, kKnob: 2.8 }, { phys: Object.assign(c.phys, { echo: true, T2s: 0.03, T2: 1.2, J: 2, S: 1 }) }) },
+  { el: 'Δύο σπιν που χτυπούν', en: 'Two beating spins', set: c => Object.assign(c, { e: 0, p: 0.5, echoSync: 0, basis: 'X', bright: 2.5, kKnob: 1.8 }, { phys: Object.assign(c.phys, { echo: false, T2s: 0.3, T2: 0.6, J: 18, S: 1 }) }) },
+  { el: 'Σιωπή Bell', en: 'Bell silence', set: c => Object.assign(c, { e: 1, p: 0, echoSync: 0, basis: 'Z', bright: 2.5, kKnob: 2.6 }, { phys: Object.assign(c.phys, { echo: false, T2s: 0.05, T2: 0.4, J: 4, S: 1 }) }) },
+  { el: 'Studie II', en: 'Studie II', set: c => Object.assign(c, { e: 0.5, p: 0, echoSync: 3, basis: 'X', tuning: 'studie', pattern: 'half', bright: 4, kKnob: 3.2 }, { phys: Object.assign(c.phys, { echo: true, T2s: 0.02, T2: 2, J: 0, S: 1 }) }) }
+];
+function buildScenes() {
+  const box = document.getElementById('scenes'); box.querySelectorAll('button').forEach(b => b.remove());
+  SCENES.forEach((s, i) => { const b = document.createElement('button'); b.className = 'chip'; b.innerHTML = `${lang === 'en' ? s.en : s.el}<kbd>${i + 1}</kbd>`; b.onclick = () => scene(i); box.appendChild(b); });
+}
+function scene(i) { takeover(); const s = SCENES[i]; if (i !== 4) { cfg.tuning = 'tet'; if (cfg.pattern === 'half') cfg.pattern = 'rolling'; } s.set(cfg); refreshPrep(); syncAll(); highlightHear(); toast((lang === 'en' ? s.en : s.el)); }
+
+/* ================= ενδείξεις ================= */
+function readout() {
+  const M0 = Math.hypot(prep.coh[0][0].re + prep.coh[0][1].re, prep.coh[0][0].im + prep.coh[0][1].im) * 2;
+  const M1 = Math.hypot(prep.coh[1][0].re + prep.coh[1][1].re, prep.coh[1][0].im + prep.coh[1][1].im) * 2;
+  const P = Q.probs(prep.rho, cfg.basis), A = Q.toAudio(Q.syncedPhys(cfg));
+  const r = document.getElementById('readout');
+  r.innerHTML = `<span class="q0">|M⊥ q0| = <b>${num(M0, 2)}</b></span><span class="q1">|M⊥ q1| = <b>${num(M1, 2)}</b></span><span>C = <b>${num(prep.C, 2)}</b></span>` +
+    `<span>P(${cfg.basis}) = ${['00', '01', '10', '11'].map((s, i) => s + ' <b>' + num(P[i], 2) + '</b>').join(' · ')}</span>` +
+    `<span>${lang === 'en' ? 'audio' : 'ήχος'}: T2* <b>${ms(A.T2s)}</b> · J <b>${num(A.J, A.J < 10 ? 2 : 0)} Hz</b>${A.echo ? ' · 2τ <b>' + ms(2 * A.tau) + '</b>' : ''}</span>`;
+}
+function highlightHear() {
+  const A = Q.toAudio(Q.syncedPhys(cfg));
+  const on = { fid: true, echo: A.echo, j: cfg.p > 0.05 && A.J > 0.3, bell: cfg.e > 0.6 };
+  document.querySelectorAll('#hear article').forEach(a => a.classList.toggle('on', !!on[a.dataset.h]));
+}
+
+/* ================= ήχος ζωντανά ================= */
+let ctx = null, master, splitter, anL, anR, running = false, timer = null, nextT = 0, step = 0, rng = null;
+const LOOK = 0.14, kickCache = new Map();
+let lastLead = null, stepOutcome = new Array(16).fill(-1), curStep = -1;
+function ensureCtx() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+  master = ctx.createGain(); master.gain.value = 0.9;
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -6; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.12;
+  master.connect(comp); comp.connect(ctx.destination);
+  splitter = ctx.createChannelSplitter(2); comp.connect(splitter);
+  anL = ctx.createAnalyser(); anR = ctx.createAnalyser(); anL.fftSize = anR.fftSize = 2048; splitter.connect(anL, 0); splitter.connect(anR, 1);
+  return ctx;
+}
+function playBuf(mono, t, pan, channel) {
+  const sr = ctx.sampleRate, b = ctx.createBuffer(2, mono.length, sr);
+  const gl = channel === 'R' ? 0 : channel === 'L' ? 1 : Math.cos((pan + 1) * Math.PI / 4) * Math.SQRT2;
+  const gr = channel === 'L' ? 0 : channel === 'R' ? 1 : Math.sin((pan + 1) * Math.PI / 4) * Math.SQRT2;
+  const L = b.getChannelData(0), R = b.getChannelData(1);
+  for (let i = 0; i < mono.length; i++) { L[i] = mono[i] * gl; R[i] = mono[i] * gr; }
+  const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(Math.max(t, ctx.currentTime));
+}
+function schedule() {
+  const sr = ctx.sampleRate, st = Q.stepSeconds(cfg.bpm);
+  while (nextT < ctx.currentTime + LOOK) {
+    const evs = Q.stepEvents(cfg, prep, step, nextT, rng, fidF, prepBass), idx = step % 16;
+    stepOutcome[idx] = -1;
+    for (const ev of evs) {
+      let buf;
+      if (ev.kind === 'kick' || ev.kind === 'hat') { const key = ev.kind + ev.gain.toFixed(3) + sr; buf = kickCache.get(key); if (!buf) { buf = Q.renderEvent(Object.assign({}, ev, { seed: 7 }), sr); kickCache.set(key, buf); } }
+      else buf = Q.renderEvent(ev, sr);
+      playBuf(buf, ev.t, ev.pan || 0, ev.channel);
+      if (ev.outcome !== undefined) { stepOutcome[idx] = ev.outcome; lastLead = { t: ev.t, prep: ev.prep || prep, A: ev.A || Q.toAudio(Q.syncedPhys(cfg)) }; }
+    }
+    const thisStep = idx, at = nextT; setTimeout(() => { curStep = thisStep; }, Math.max(0, (at - ctx.currentTime) * 1000));
+    nextT += st; step++;
+  }
+}
+function startLive() {
+  ensureCtx(); ctx.resume(); stopPiece();
+  rng = Q.mulberry32(cfg.seed); step = 0; nextT = ctx.currentTime + 0.06; running = true;
+  timer = setInterval(schedule, 25); schedule(); updatePlayLabel(); wakeLock(true);
+}
+function stopLive() { running = false; clearInterval(timer); timer = null; curStep = -1; updatePlayLabel(); wakeLock(false); }
+function updatePlayLabel() { const b = document.getElementById('play'); b.setAttribute('aria-pressed', running); b.querySelector('[data-i18n]').textContent = running ? (lang === 'en' ? 'Stop' : 'Στοπ') : tr('play'); }
+let wl = null; async function wakeLock(on) { try { if (on && navigator.wakeLock) wl = await navigator.wakeLock.request('screen'); else if (wl) { await wl.release(); wl = null; } } catch (e) { } }
+document.getElementById('play').onclick = () => running ? stopLive() : startLive();
+
+/* ================= οθόνη ================= */
+const cv = document.getElementById('scope'), g = cv.getContext('2d');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL = { ch1: css('--ch1'), ch2: css('--ch2'), ink: css('--ink'), dim: css('--ink-dim'), line: css('--line'), panel: css('--panel'), p2: css('--panel-2') };
+const bufL = new Float32Array(2048), bufR = new Float32Array(2048);
+const OUT = ['|00⟩', '|01⟩', '|10⟩', '|11⟩'];
+function frame() {
+  const W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
+  g.fillStyle = COL.panel; g.fillRect(0, 0, W, H);
+  // πλέγμα
+  g.strokeStyle = COL.line; g.lineWidth = 1;
+  for (let x = 0; x <= W; x += W / 16) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H * 0.82); g.stroke(); }
+  // δίσκος σπιν
+  lessonTick(); const LA = lesson.active; const cx = W * 0.25, cy = LA ? H * 0.55 : H * 0.41, R = LA ? Math.min(W * 0.17, H * 0.22) : Math.min(W * 0.2, H * 0.33);
+  g.fillStyle = COL.p2; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = COL.line; g.lineWidth = 2; g.stroke();
+  g.beginPath(); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.stroke();
+  // δακτύλιος C
+  g.lineWidth = 10; g.lineCap = 'round'; g.strokeStyle = COL.line; g.beginPath(); g.arc(cx, cy, R + 18, 0, Math.PI * 2); g.stroke();
+  if (prep.C > 0.005) { g.strokeStyle = COL.ink; g.beginPath(); g.arc(cx, cy, R + 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prep.C); g.stroke(); }
+  g.lineCap = 'butt';
+  // διανύσματα
+  let s0 = { re: 0, im: 0 }, s1 = { re: 0, im: 0 };
+  if (ctx && lastLead && ctx.currentTime >= lastLead.t) { const t = ctx.currentTime - lastLead.t; s0 = Q.signalAt(lastLead.prep, lastLead.A, 0, t); s1 = Q.signalAt(lastLead.prep, lastLead.A, 1, t); }
+  else if (!running && !piece.src) { const t = (performance.now() / 1000) % 1.5, A = Q.toAudio(Q.syncedPhys(cfg)); s0 = Q.signalAt(prep, A, 0, t); s1 = Q.signalAt(prep, A, 1, t); }
+  const arrow = (s, col) => { const x = cx + R * s.re, y = cy - R * s.im; g.strokeStyle = col; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx, cy); g.lineTo(x, y); g.stroke(); g.fillStyle = col; g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.fill(); g.lineCap = 'butt'; };
+  arrow(s1, COL.ch2); arrow(s0, COL.ch1);
+  g.font = '600 26px ' + css('--f-mono'); g.fillStyle = COL.dim; g.textAlign = 'left';
+  g.fillText('C = ' + num(prep.C, 2), cx - R - 20, cy + R + (LA ? 44 : 66));
+  g.fillStyle = COL.ch1; g.fillText('q0', cx + R + 34, cy - R + 10); g.fillStyle = COL.ch2; g.fillText('q1', cx + R + 34, cy - R + 44);
+  // παλμογράφος διπλής δέσμης
+  const ox = W * 0.52, ow = W * 0.45, oy1 = LA ? H * 0.40 : H * 0.24, oy2 = LA ? H * 0.66 : H * 0.58, oh = LA ? H * 0.10 : H * 0.15;
+  g.strokeStyle = COL.line; g.lineWidth = 1; g.strokeRect(ox, oy1 - oh, ow, oh * 2); g.strokeRect(ox, oy2 - oh, ow, oh * 2);
+  if (anL) { anL.getFloatTimeDomainData(bufL); anR.getFloatTimeDomainData(bufR); }
+  const trace = (buf, oy, col) => { let z = 0; for (let i = 1; i < 1024; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { z = i; break; } g.strokeStyle = col; g.lineWidth = 3; g.beginPath(); for (let i = 0; i < 900; i++) { const x = ox + ow * i / 900, y = oy - oh * Math.max(-1, Math.min(1, buf[z + i] * 1.1)); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); };
+  trace(bufL, oy1, COL.ch1); trace(bufR, oy2, COL.ch2);
+  g.font = '600 22px ' + css('--f-mono'); g.fillStyle = COL.ch1; g.fillText('CH1 · L', ox + 10, oy1 - oh + 28); g.fillStyle = COL.ch2; g.fillText('CH2 · R', ox + 10, oy2 - oh + 28);
+  // βήματα
+  const sy = H * 0.86, sw = W / 16;
+  for (let i = 0; i < 16; i++) {
+    const on = i === curStep, o = stepOutcome[i];
+    g.fillStyle = on ? COL.ch1 : COL.p2; g.fillRect(i * sw + 3, sy, sw - 6, H * 0.11);
+    if (o >= 0) { g.fillStyle = on ? COL.panel : (o === 0 || o === 3 ? COL.ink : COL.ch2); g.font = '600 ' + Math.round(sw * 0.26) + 'px ' + css('--f-mono'); g.textAlign = 'center'; g.fillText(OUT[o], i * sw + sw / 2, sy + H * 0.072); }
+  }
+  g.textAlign = 'left';
+  drawLessonBand(W, H);
+  if (piece.src) drawPieceHead();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+document.getElementById('fs').onclick = async () => { try { const st = document.getElementById('stage'); document.fullscreenElement ? await document.exitFullscreen() : await st.requestFullscreen(); } catch (e) { toast(lang === 'en' ? 'Fullscreen is not available in this view.' : 'Η πλήρης οθόνη δεν είναι διαθέσιμη εδώ.'); } };
+
+/* ================= έλεγχοι πάνω γραμμής ================= */
+const setBpm = v => { cfg.bpm = Math.max(90, Math.min(200, Math.round(v))); document.getElementById('bpm').value = cfg.bpm; document.documentElement.style.setProperty('--bpm', cfg.bpm); readout(); };
+document.getElementById('bpm').onchange = e => setBpm(+e.target.value);
+document.getElementById('bpmDown').onclick = () => setBpm(cfg.bpm - 1);
+document.getElementById('bpmUp').onclick = () => setBpm(cfg.bpm + 1);
+let taps = []; document.getElementById('tap').onclick = () => { const now = performance.now(); taps = taps.filter(t => now - t < 2500); taps.push(now); if (taps.length > 2) setBpm(60000 * (taps.length - 1) / (now - taps[0])); };
+document.getElementById('lang-el').onclick = () => { lang = 'el'; applyLang(); };
+document.getElementById('lang-en').onclick = () => { lang = 'en'; applyLang(); };
+document.getElementById('echo').onclick = e => { takeover(); const on = !(cfg.phys.echo || cfg.echoSync > 0); cfg.phys.echo = on; if (!on) cfg.echoSync = 0; syncAll(); highlightHear(); };
+document.getElementById('sync').onchange = e => { takeover(); cfg.echoSync = +e.target.value; if (cfg.echoSync) cfg.phys.echo = true; syncAll(); highlightHear(); };
+document.querySelectorAll('#basis button').forEach(b => b.onclick = () => { takeover(); cfg.basis = b.dataset.b; syncAll(); });
+document.getElementById('pattern').onchange = e => { takeover(); cfg.pattern = e.target.value; };
+document.getElementById('root').onchange = e => { cfg.rootMidi = +e.target.value; };
+document.getElementById('tuning').onchange = e => { cfg.tuning = e.target.value; };
+document.getElementById('seed').onchange = e => { cfg.seed = Math.round(+e.target.value) || 1; rng = Q.mulberry32(cfg.seed); };
+document.getElementById('dice').onclick = () => { cfg.seed = Math.floor(Math.random() * 1e6); document.getElementById('seed').value = cfg.seed; rng = Q.mulberry32(cfg.seed); };
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, select, textarea')) return;
+  if (e.code === 'Space') { e.preventDefault(); running ? stopLive() : startLive(); }
+  const n = +e.key; if (n >= 1 && n <= SCENES.length) scene(n - 1);
+});
+
+/* ================= σύνθεση ================= */
+const MOMENTS = [
+  { el: 'Ι · Μίγματα', en: 'I · Mixtures', cel: 'Μίγματα ημιτόνων στην κλίμακα της Studie II (βήμα 5^(1/25), χωρίς οκτάβες). Τα βάρη τους είναι πιθανότητες Born· το σβήσιμο είναι το T2* ενός σπιν.', cen: 'Sine mixtures on the Studie II scale (step 5^(1/25), no octaves). Their weights are Born probabilities; the fade is a spin’s T2*.' },
+  { el: 'ΙΙ · FID', en: 'II · FID', cel: 'Μεμονωμένα νύγματα. Το T2* μικραίνει από 1,2 s σε 30 ms και ο ήχος από καμπάνα γίνεται κρούση. Ακούγεται και το αργό διακρότημα J.', cen: 'Single plucks. T2* shrinks from 1.2 s to 30 ms and the sound turns from bell to click. The slow J beat is audible too.' },
+  { el: 'ΙΙΙ · Ηχώ', en: 'III · Echo', cel: 'Κάθε νότα σβήνει και επιστρέφει στο 2τ. Το τ μικραίνει ώσπου η ηχώ να πέφτει πάνω στο beat των 145 BPM. Το drone είναι ο πληθυσμός (T1), που ο π παλμός αντιστρέφει.', cen: 'Each note fades and returns at 2τ. τ shrinks until the echo lands on the 145 BPM beat. The drone is the population (T1), flipped by the π pulse.' },
+  { el: 'IV · Ρυθμός→τόνος', en: 'IV · Rhythm→pitch', cel: 'J = 150 Hz σταθερό. Η διαστολή πέφτει από ×150 σε ×0,75: το διακρότημα επιταχύνεται, γίνεται τραχύτητα και στο τέλος δύο νότες 200 Hz μακριά.', cen: 'J = 150 Hz fixed. The stretch falls from ×150 to ×0.75: the beat speeds up, turns rough, and ends as two notes 200 Hz apart.' },
+  { el: 'V · Σιωπή Bell', en: 'V · Bell silence', cel: 'Η πύλη CNOT ανοίγει σιγά. Αριστερά q0, δεξιά q1: το τοπικό σήμα σβήνει, το φίλτρο αρχίζει να τραγουδά. Μετά, τέσσερα δευτερόλεπτα σιωπής.', cen: 'The CNOT opens slowly. Left q0, right q1: the local signal fades and the filter begins to sing. Then four seconds of silence.' },
+  { el: 'Drop', en: 'Drop', cel: 'Το groove στα 145 BPM με την κατάσταση Bell: η μελωδία παίζει μόνο θεμέλιο και οκτάβα, γιατί τα δύο σπιν συμφωνούν πάντα. Στο δεύτερο μισό η σύνδεση χαλαρώνει και επιστρέφουν τα τρίτονα.', cen: 'The 145 BPM groove with the Bell state: the melody plays only root and octave, because the spins always agree. In the second half the link loosens and the tritones return.' }
+];
+const piece = { marks: [0, 40, 80, 120, 160, 190, 244.5], total: 244.5, src: null, t0: 0, L: null, R: null, sr: 48000 };
+function buildTimeline() {
+  const tl = document.getElementById('tl'); tl.querySelectorAll('div').forEach(d => d.remove());
+  MOMENTS.forEach((m, i) => { const d = document.createElement('div'); d.style.flex = (piece.marks[i + 1] - piece.marks[i]); d.innerHTML = `${lang === 'en' ? m.en : m.el}<b>${fmtT(piece.marks[i])}</b>`; d.onclick = () => showMoment(i, true); tl.insertBefore(d, document.getElementById('ph')); });
+  showMoment(curMoment);
+}
+let curMoment = 0;
+function showMoment(i, seek) {
+  curMoment = i; document.querySelectorAll('#tl div').forEach((d, k) => d.classList.toggle('on', k === i));
+  document.getElementById('caption').textContent = lang === 'en' ? MOMENTS[i].cen : MOMENTS[i].cel;
+  if (seek && piece.L) playPieceFrom(piece.marks[i]);
+}
+const fmtT = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function drawPieceHead() {
+  const t = Math.min(piece.total, ctx.currentTime - piece.t0);
+  document.getElementById('ph').style.left = (100 * t / piece.total) + '%';
+  let i = 0; while (i < MOMENTS.length - 1 && t >= piece.marks[i + 1]) i++;
+  if (i !== curMoment) showMoment(i);
+  if (t >= piece.total) stopPiece();
+}
+// worker από τον ίδιο κώδικα της μηχανής
+let worker = null;
+function getWorker() {
+  if (worker) return worker;
+  const src = document.getElementById('engine').textContent + `
+  self.onmessage = e => { const m = e.data, Q = self.QSynth; let ev, total;
+    if (m.job === 'piece') { const P = Q.pieceEvents(1954); ev = P.events; total = P.total; }
+    else { ev = Q.grooveEvents(m.cfg, m.bars, 0, m.fid); total = m.bars * 16 * Q.stepSeconds(m.cfg.bpm); }
+    const [L, R] = Q.renderTimeline(ev, total, m.sr, p => self.postMessage({ progress: p }));
+    self.postMessage({ done: true, L, R, total }, [L.buffer, R.buffer]); };`;
+  worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  return worker;
+}
+function render(job, extra, statusEl) {
+  return new Promise((res, rej) => {
+    const w = getWorker();
+    w.onmessage = e => { if (e.data.progress !== undefined) statusEl.textContent = (lang === 'en' ? 'Rendering… ' : 'Απόδοση… ') + Math.round(e.data.progress * 100) + '%'; else if (e.data.done) { statusEl.textContent = ''; res(e.data); } };
+    w.onerror = err => { statusEl.textContent = lang === 'en' ? 'Rendering failed.' : 'Η απόδοση απέτυχε.'; rej(err); };
+    w.postMessage(Object.assign({ job }, extra));
+  });
+}
+document.getElementById('piecePlay').onclick = async () => {
+  ensureCtx(); ctx.resume(); if (running) stopLive();
+  const st = document.getElementById('pieceStatus');
+  if (!piece.L) {
+    document.getElementById('piecePlay').disabled = true;
+    try { const r = await render('piece', { sr: 48000 }, st); piece.L = r.L; piece.R = r.R; piece.total = r.total; }
+    catch (e) { document.getElementById('piecePlay').disabled = false; return; }
+    document.getElementById('piecePlay').disabled = false; document.getElementById('pieceSave').disabled = false;
+  }
+  playPieceFrom(0);
+};
+function playPieceFrom(t) {
+  stopPiece(true); ensureCtx(); ctx.resume(); if (running) stopLive();
+  const b = ctx.createBuffer(2, piece.L.length, 48000); b.copyToChannel(piece.L, 0); b.copyToChannel(piece.R, 1);
+  const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(ctx.currentTime + 0.05, t);
+  piece.src = s; piece.t0 = ctx.currentTime + 0.05 - t; document.getElementById('pieceStop').disabled = false;
+}
+function stopPiece(keep) { if (piece.src) { try { piece.src.stop(); } catch (e) { } piece.src = null; } if (!keep) { document.getElementById('pieceStop').disabled = true; document.getElementById('ph').style.left = '0%'; } }
+document.getElementById('pieceStop').onclick = () => stopPiece();
+document.getElementById('pieceSave').onclick = () => saveAudio(piece.L, piece.R, 48000, 'dyo-spin-pente-stigmes', document.getElementById('pieceStatus'));
+
+/* ================= αποθήκευση ================= */
+let dl = null; if (window.claude && window.claude.use) window.claude.use('downloads').then(d => { dl = d; }).catch(() => { });
+function crc32(u8) { let c, crc = 0xFFFFFFFF; const T = crc32.T || (crc32.T = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); for (let i = 0; i < u8.length; i++) crc = T[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(name, data) {
+  const nm = new TextEncoder().encode(name), crc = crc32(data), n = data.length;
+  const lh = new DataView(new ArrayBuffer(30)); lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint32(14, crc, true); lh.setUint32(18, n, true); lh.setUint32(22, n, true); lh.setUint16(26, nm.length, true);
+  const cd = new DataView(new ArrayBuffer(46)); cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint32(16, crc, true); cd.setUint32(20, n, true); cd.setUint32(24, n, true); cd.setUint16(28, nm.length, true);
+  const end = new DataView(new ArrayBuffer(22)); end.setUint32(0, 0x06054b50, true); end.setUint16(8, 1, true); end.setUint16(10, 1, true); end.setUint32(12, 46 + nm.length, true); end.setUint32(16, 30 + nm.length + n, true);
+  return new Blob([lh, nm, data, cd, nm, end]);
+}
+async function saveAudio(L, R, sr, base, statusEl) {
+  const wav = new Uint8Array(Q.wav(L, R, sr));
+  if (OFFLINE || !dl) {
+    if (!OFFLINE && !dl) { statusEl.textContent = lang === 'en' ? 'Saving files is not available in this view. Use the offline HTML file.' : 'Η αποθήκευση αρχείων δεν είναι διαθέσιμη εδώ. Χρησιμοποίησε το αρχείο HTML εκτός σύνδεσης.'; return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })); a.download = base + '.wav'; a.click(); return;
+  }
+  try { await dl.save({ filename: base + '.zip', data: zipStore(base + '.wav', wav) }); statusEl.textContent = lang === 'en' ? 'Saved (WAV inside a .zip).' : 'Αποθηκεύτηκε (WAV μέσα σε .zip).'; }
+  catch (e) { statusEl.textContent = e && e.code === 'declined' ? '' : (lang === 'en' ? 'Could not save: ' : 'Δεν αποθηκεύτηκε: ') + (e && e.code || e); }
+}
+document.getElementById('loopSave').onclick = async () => {
+  const bars = +document.getElementById('bars').value, st = document.getElementById('loopStatus');
+  const c = JSON.parse(JSON.stringify(cfg));
+  const r = await render('loop', { cfg: c, bars, sr: 48000, fid: fidF }, st);
+  const key = document.getElementById('root').selectedOptions[0].textContent.replace('♯', 's');
+  saveAudio(r.L, r.R, 48000, `spin-ladder_${cfg.bpm}bpm_${key}_${bars}bars_seed${cfg.seed}`, st);
+};
+
+/* ================= FID από το Studio ================= */
+document.getElementById('fidFile').onchange = async e => {
+  const f = e.target.files[0], st = document.getElementById('fidStatus'); if (!f) return;
+  try { fidF = Q.parseStudioFID(await f.text()); st.textContent = (lang === 'en' ? 'Lead plays: ' : 'Το lead παίζει: ') + f.name + ' · ' + num(fidF.windowMs, 0) + ' ms'; document.getElementById('fidClear').disabled = false; }
+  catch (err) { fidF = null; st.textContent = lang === 'en' ? 'This is not an FID export from Quantum Music Studio (format pundora-fid).' : 'Δεν είναι εξαγωγή FID του Quantum Music Studio (μορφή pundora-fid).'; }
+};
+document.getElementById('fidClear').onclick = () => { fidF = null; document.getElementById('fidFile').value = ''; document.getElementById('fidStatus').textContent = ''; document.getElementById('fidClear').disabled = true; };
+
+/* ================= MIDI ================= */
+const CCMAP = { 1: 'e', 2: 'p', 3: 'T2s', 4: 'J', 5: 'tau', 6: 'bright', 7: 'kKnob', 8: 'S' };
+function setMidiStatus(t) { document.getElementById('midiStatus').textContent = t; }
+document.getElementById('midiOn').onclick = async () => {
+  if (!navigator.requestMIDIAccess) { setMidiStatus(lang === 'en' ? 'This browser has no Web MIDI. Chrome or Edge on a computer works.' : 'Αυτός ο φυλλομετρητής δεν έχει Web MIDI. Λειτουργεί σε Chrome ή Edge σε υπολογιστή.'); return; }
+  try {
+    const acc = await navigator.requestMIDIAccess();
+    const bind = () => { let n = 0; acc.inputs.forEach(inp => { inp.onmidimessage = onMidi; n++; }); setMidiStatus((lang === 'en' ? 'Inputs: ' : 'Είσοδοι: ') + n); };
+    acc.onstatechange = bind; bind(); document.getElementById('midiLearn').disabled = false;
+  } catch (e) { setMidiStatus(lang === 'en' ? 'MIDI was refused here. Open the offline HTML file in Chrome.' : 'Το MIDI δεν επιτράπηκε εδώ. Άνοιξε το αρχείο HTML εκτός σύνδεσης σε Chrome.'); }
+};
+document.getElementById('midiLearn').onclick = () => { learnArmed = !learnArmed; learnTarget = null; knobs.forEach(o => o.host.classList.remove('learn')); setMidiStatus(learnArmed ? (lang === 'en' ? 'Click a knob.' : 'Κάνε κλικ σε ένα κουμπί.') : ''); };
+function onMidi(m) {
+  const [s, d1, d2] = m.data, type = s & 0xF0;
+  if (type === 0xB0) {
+    if (learnArmed && learnTarget) { for (const c in CCMAP) if (CCMAP[c] === learnTarget) delete CCMAP[c]; CCMAP[d1] = learnTarget; setMidiStatus('CC ' + d1 + ' → ' + knobs.get(learnTarget).host.querySelector('.kl').textContent); learnArmed = false; knobs.forEach(o => o.host.classList.remove('learn')); learnTarget = null; return; }
+    const k = CCMAP[d1]; if (k && knobs.get(k)) knobs.get(k).setN(d2 / 127);
+  } else if (type === 0x90 && d2 > 0) {
+    ensureCtx(); ctx.resume();
+    const A = Q.toAudio(Q.syncedPhys(cfg)), t = ctx.currentTime + 0.01, dur = Math.min(2.5, Math.max(0.35, A.echo ? 2 * A.tau + 3 * A.T2s : 4 * A.T2s));
+    const ev = fidF ? { kind: 'fid', F: fidF, freq: Q.midiHz(d1), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: cfg.mix.lead * (0.4 + 0.6 * d2 / 127) }
+      : { kind: 'spin', prep, A, q: 0, freq: Q.midiHz(d1), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: cfg.mix.lead * (0.4 + 0.6 * d2 / 127), exciter: 0.35 };
+    playBuf(Q.renderEvent(ev, ctx.sampleRate), t, 0); lastLead = { t, prep, A };
+  }
+}
+
+/* ================= έλεγχοι ================= */
+function buildVerify() {
+  const rows = VERIFY.map(r => `<tr><td class="${r.ok ? 'ok' : ''}">${r.ok ? 'OK' : '✗'}</td><td>${r.name}</td><td>${fmtV(r.expected)}</td><td>${fmtV(r.got)}</td></tr>`).join('');
+  document.getElementById('vt').innerHTML = `<table><thead><tr><th></th><th>${lang === 'en' ? 'check' : 'έλεγχος'}</th><th>${lang === 'en' ? 'expected' : 'αναμενόμενο'}</th><th>${lang === 'en' ? 'model' : 'μοντέλο'}</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+const fmtV = v => typeof v === 'number' ? (Math.abs(v) < 1e-6 && v !== 0 ? v.toExponential(1) : +v.toPrecision(6)).toString().replace('.', lang === 'el' ? ',' : '.') : String(v);
+
+function toast(t) { const n = document.getElementById('toast'); n.textContent = t; n.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { n.hidden = true; }, 1600); }
+
+/* ================= μάθημα: αυτόματος πιλότος 96 μέτρων ================= */
+const LESSON = [
+  { bar: 0, len: 8, focus: ['stage'],
+    jump: { T2s: 0.3, T2: 1.2, J: 2, S: 1, tau: 0.05, e: 0, p: 0.25, bright: 2.5, kKnob: 1.6, bassBright: 2.2, density: 0.55, leadOct: 3, mkick: 0, mbass: 0, mhat: 0, mlead: 0.45 },
+    set: { pattern: 'none', echo: false, echoSync: 0, basis: 'Z', tuning: 'tet', hold: 2 },
+    el: { t: 'Ένα σπιν, μία νότα', h: 'Κοίτα το κεχριμπαρί βέλος σε κάθε νότα', x: 'Κάθε νότα του lead είναι ένας πυρήνας που γυρίζει. Το κεχριμπαρί βέλος είναι η μαγνήτισή του: όσο γυρίζει ακούς τόνο, όσο μικραίνει ο ήχος σβήνει.' },
+    en: { t: 'One spin, one note', h: 'Watch the amber arrow on every note', x: 'Every lead note is a nucleus precessing. The amber arrow is its magnetisation: while it turns you hear a tone, as it shrinks the sound fades.' } },
+  { bar: 8, len: 8, focus: ['T2s'], ramp: [['T2s', 0.035, 6]],
+    el: { t: 'T2*: καμπάνα ή pluck', h: 'Το T2* κατεβαίνει: η καμπάνα γίνεται pluck', x: 'Το T2* λέει πόσο γρήγορα χάνουν τον βηματισμό τους τα σπιν του δείγματος. Μεγάλο: καμπάνα. Μικρό: το pluck του psytrance. Εδώ δεν υπάρχει ADSR· τον φάκελο τον δίνει η φυσική.' },
+    en: { t: 'T2*: bell or pluck', h: 'T2* goes down: the bell becomes a pluck', x: 'T2* is how fast the sample’s spins fall out of step. Long: a bell. Short: the psytrance pluck. There is no ADSR here; physics sets the envelope.' } },
+  { bar: 16, len: 8, focus: ['mkick', 'mbass'], set: { pattern: 'rolling' }, ramp: [['mkick', 0.9, 1], ['mbass', 0.6, 2], ['mhat', 0.14, 4]],
+    el: { t: 'Το rolling bass', h: 'Kick στον χτύπο, μπάσο στα τρία 16α ανάμεσα', x: 'Kick σε κάθε χτύπο και μπάσο στα τρία δέκατα έκτα ανάμεσα. Κάθε νότα του μπάσου είναι ένα μικρό FID με το ίδιο T2*. Το kick και το hi-hat είναι κλασικά, χωρίς φυσική.' },
+    en: { t: 'The rolling bass', h: 'Kick on the beat, bass on the three 16ths between', x: 'A kick on every beat, bass on the three sixteenths in between. Each bass note is a tiny FID with the same T2*. Kick and hi-hat are classical, no physics.' } },
+  { bar: 24, len: 8, focus: ['bright', 'kKnob'], ramp: [['bright', 5, 6], ['kKnob', 3.3, 6]],
+    el: { t: 'Το φίλτρο ακολουθεί το σπιν', h: 'Φως και συντονισμός ανεβαίνουν: acid', x: 'Η συχνότητα του φίλτρου σκάλας ανεβαίνει όσο η μαγνήτιση είναι μεγάλη και κλείνει καθώς σβήνει. Ανεβάζοντας τον συντονισμό ακούς το «κελάηδισμα» του acid.' },
+    en: { t: 'The filter follows the spin', h: 'Brightness and resonance up: acid', x: 'The ladder filter opens while the magnetisation is large and closes as it fades. Raise the resonance and you hear the acid squelch.' } },
+  { bar: 32, len: 8, focus: ['#echo', '#sync'], set: { echo: true, echoSync: 2 }, ramp: [['T2', 1.6, 4]],
+    el: { t: 'Ηχώ στο beat', h: 'Ο ήχος επιστρέφει στο 2τ = ένα όγδοο', x: 'Ένας παλμός π τη στιγμή τ αντιστρέφει τη φάση των σπιν: ό,τι σκόρπισε ξαναμαζεύεται στο 2τ, χωρίς νέα νότα. Κλείδωσε το 2τ στο 1/8 και η ηχώ γίνεται το delay του track.' },
+    en: { t: 'Echo on the beat', h: 'The sound comes back at 2τ = one eighth', x: 'A π pulse at time τ reverses the spins’ phases: what spread out regathers at 2τ, with no new note. Lock 2τ to 1/8 and the echo becomes the track’s delay.' } },
+  { bar: 40, len: 8, focus: ['p', 'J'], ramp: [['p', 0.5, 2], ['J', 35, 6]],
+    el: { t: 'Θερμός γείτονας, σύζευξη J', h: 'Το J ανεβαίνει: παλμός, μετά γρέζι', x: 'Με θερμό γείτονα κάθε σπιν έχει δύο συχνότητες που απέχουν J. Μικρό J: αργός παλμός μέσα στη νότα. Μεγάλο J: γρέζι, και στο τέλος δύο νότες.' },
+    en: { t: 'Warm partner, J coupling', h: 'J rises: a pulse, then grit', x: 'With a warm partner each spin has two frequencies, J apart. Small J: a slow pulse inside the note. Large J: grit, and finally two notes.' } },
+  { bar: 48, len: 8, focus: ['#basis', 'density'], set: { basis: 'X' }, ramp: [['J', 4, 2], ['density', 0.9, 4]],
+    el: { t: 'Ο Born γράφει το riff', h: 'Βάση X: νέες πιθανότητες, νέο riff', x: 'Κάθε νότα του lead είναι μια μέτρηση: |00⟩ θεμέλιο, |01⟩ και |10⟩ τρίτονο, |11⟩ οκτάβα. Άλλαξε βάση μέτρησης και αλλάζουν οι πιθανότητες, άρα και το riff. Δες τα βήματα κάτω από τον παλμογράφο.' },
+    en: { t: 'Born writes the riff', h: 'X basis: new probabilities, new riff', x: 'Every lead note is a measurement: |00⟩ root, |01⟩ and |10⟩ tritone, |11⟩ octave. Change the readout basis and the probabilities change, so the riff changes. Watch the steps under the scope.' } },
+  { bar: 56, len: 8, focus: ['e', 'p'], set: { pattern: 'none', basis: 'Z', echo: false, echoSync: 0 }, ramp: [['p', 0, 2], ['e', 1, 6]],
+    el: { t: 'Breakdown: η σιωπή Bell', h: 'Κρύος γείτονας και CNOT: το φίλτρο τραγουδά', x: 'Τα τύμπανα φεύγουν. Ο γείτονας κρυώνει και η CNOT ανοίγει: το βέλος μαζεύεται στο κέντρο, ο δακτύλιος C γεμίζει και το φίλτρο αρχίζει να τραγουδά μόνο του. Με θερμό γείτονα θα είχες σιωπή χωρίς εμπλοκή.' },
+    en: { t: 'Breakdown: the Bell silence', h: 'Cold partner and CNOT: the filter sings', x: 'The drums drop out. The partner cools and the CNOT opens: the arrow shrinks to the centre, the C ring fills and the filter starts to sing on its own. With a warm partner you would get silence without entanglement.' } },
+  { bar: 64, len: 8, focus: ['S', 'J'], jump: { e: 0, p: 0.5, J: 150, S: 100, density: 1, leadOct: 2 }, set: { pattern: 'riser', hold: 8, echo: false, echoSync: 0 }, ramp: [['S', 1.2, 8], ['mhat', 0.22, 8]],
+    el: { t: 'Riser: ο ρυθμός γίνεται τόνος', h: 'J = 150 Hz, η διαστολή πέφτει ×100 → ×1', x: 'Το J μένει 150 Hz και ο χρόνος τεντώνεται ×100: ακούς αργό παλμό. Καθώς η διαστολή πέφτει, ο παλμός επιταχύνεται ώσπου γίνεται δύο νότες. Είναι η ιδέα του Kontakte του Stockhausen, με πραγματική φυσική.' },
+    en: { t: 'Riser: rhythm becomes pitch', h: 'J = 150 Hz, the stretch falls ×100 → ×1', x: 'J stays at 150 Hz and time is stretched ×100: you hear a slow pulse. As the stretch falls the pulse speeds up until it becomes two notes. It is the idea behind Stockhausen’s Kontakte, with real physics.' } },
+  { bar: 72, len: 16, focus: ['e', 'stage'], jump: { e: 1, p: 0, J: 4, S: 1, density: 0.85, leadOct: 3, mkick: 0.9, mbass: 0.6, mhat: 0.14 }, set: { pattern: 'rolling', hold: 2, basis: 'Z', echo: true, echoSync: 2 },
+    el: { t: 'Drop', h: 'Bell: μόνο θεμέλιο και οκτάβα', x: 'Η κατάσταση είναι Bell: τα δύο σπιν συμφωνούν πάντα, γι’ αυτό το riff παίζει μόνο θεμέλιο και οκτάβα. Ο ήχος του lead είναι το φίλτρο που αυτοταλαντώνεται, γιατί C = 1.' },
+    en: { t: 'Drop', h: 'Bell: only root and octave', x: 'The state is Bell: the two spins always agree, so the riff plays only root and octave. The lead’s sound is the filter self-oscillating, because C = 1.' } },
+  { bar: 88, len: 8, focus: ['e'], ramp: [['e', 0.45, 8]],
+    el: { t: 'Λύσε τη σύνδεση', h: 'CNOT 180° → 80°: επιστρέφουν τα τρίτονα', x: 'Η CNOT χαλαρώνει: το βέλος μεγαλώνει ξανά, ο συντονισμός πέφτει και τα τρίτονα γυρίζουν στη μελωδία. Από εδώ, η σκηνή είναι δική σου.' },
+    en: { t: 'Release the link', h: 'CNOT 180° → 80°: the tritones return', x: 'The CNOT loosens: the arrow grows again, the resonance drops and the tritones come back into the melody. From here the scene is yours.' } }
+];
+const LESSON_END = 96;
+const LESSON_DONE = { el: { t: 'Σειρά σου', x: 'Το μάθημα τελείωσε, η μουσική συνεχίζει. Πλήκτρα 1–5: σκηνές. Space: στοπ. Γύρνα οποιοδήποτε κουμπί.' },
+  en: { t: 'Your turn', x: 'The lesson is over; the music keeps going. Keys 1–5: scenes. Space: stop. Turn any knob.' } };
+const lesson = { active: false, paused: false, done: false, bar: 0, idx: -1, start: {}, lastT: 0, auto: false };
+const LT = { el: { pause: 'Παύση', resume: 'Συνέχεια', next: 'Επόμενο', exit: 'Έξοδος', took: 'Πήρες τον έλεγχο. Πάτα «Συνέχεια» για να συνεχίσει το μάθημα.', of: 'από' },
+  en: { pause: 'Pause', resume: 'Resume', next: 'Next', exit: 'Exit', took: 'You took control. Press Resume to continue the lesson.', of: 'of' } };
+const lt = k => LT[lang][k];
+const ease = u => u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+
+function applySet(s) {
+  if (!s) return;
+  if ('pattern' in s) cfg.pattern = s.pattern;
+  if ('echo' in s) cfg.phys.echo = s.echo;
+  if ('echoSync' in s) cfg.echoSync = s.echoSync;
+  if ('basis' in s) cfg.basis = s.basis;
+  if ('tuning' in s) cfg.tuning = s.tuning;
+  if ('hold' in s) cfg.hold = s.hold;
+}
+function enterCue(i) {
+  const c = LESSON[i]; lesson.idx = i; lesson.auto = true;
+  if (c.jump) for (const k in c.jump) knobs.get(k).setV(c.jump[k]);
+  applySet(c.set); refreshPrep(); syncAll();
+  lesson.start = {}; (c.ramp || []).forEach(([k]) => { lesson.start[k] = knobs.get(k).n; });
+  lesson.auto = false;
+  focusOn(c.focus); renderLesson(); highlightHear();
+}
+function finishCue(i) { const c = LESSON[i]; lesson.auto = true; (c.ramp || []).forEach(([k, to]) => knobs.get(k).setV(to)); refreshPrep(); lesson.auto = false; }
+function focusOn(list) {
+  document.querySelectorAll('.focus').forEach(n => n.classList.remove('focus'));
+  document.querySelectorAll('.mod.focus-mod').forEach(n => n.classList.remove('focus-mod'));
+  (list || []).forEach(f => {
+    const el = f === 'stage' ? document.getElementById('stage') : f[0] === '#' ? document.querySelector(f) : knobs.get(f) && knobs.get(f).host;
+    if (!el) return; el.classList.add('focus'); const m = el.closest('.mod'); if (m) m.classList.add('focus-mod');
+  });
+}
+function liveLine() {
+  if (lesson.done || lesson.idx < 0) return '';
+  const c = LESSON[lesson.idx];
+  return (c.ramp || []).filter(([k]) => !k.startsWith('m')).map(([k, to]) => { const d = KDEF[k]; return `${lang === 'en' ? d.en : d.el} ${d.fmt(d.get())} → ${d.fmt(to)}`; }).join('   ');
+}
+function renderLesson() {
+  const box = document.getElementById('lesson'); box.hidden = !lesson.active;
+  document.getElementById('lessonBtn').setAttribute('aria-pressed', lesson.active);
+  if (!lesson.active) { document.body.style.paddingBottom = ''; return; }
+  const txt = lesson.done ? LESSON_DONE[lang] : LESSON[Math.max(0, lesson.idx)][lang];
+  document.getElementById('lNo').textContent = lesson.done ? '✓' : `${lesson.idx + 1} ${lt('of')} ${LESSON.length}`;
+  document.getElementById('lTitle').textContent = txt.t;
+  document.getElementById('lText').textContent = txt.x;
+  document.getElementById('lPause').textContent = lesson.paused ? lt('resume') : lt('pause');
+  document.getElementById('lPause').disabled = lesson.done;
+  document.getElementById('lNext').textContent = lt('next'); document.getElementById('lNext').disabled = lesson.done;
+  document.getElementById('lExit').textContent = lt('exit');
+  const tr = document.getElementById('lTrack');
+  if (!tr.children.length) LESSON.forEach(c => { const s = document.createElement('span'); s.style.flex = c.len; s.appendChild(document.createElement('i')); tr.appendChild(s); });
+  updateTrack(); document.getElementById('lLive').textContent = liveLine();
+  requestAnimationFrame(() => { document.body.style.paddingBottom = (box.offsetHeight + 24) + 'px'; });
+}
+function updateTrack() {
+  [...document.getElementById('lTrack').children].forEach((s, i) => { const c = LESSON[i]; const u = Math.max(0, Math.min(1, (lesson.bar - c.bar) / c.len)); s.firstChild.style.width = (u * 100) + '%'; s.classList.toggle('now', i === lesson.idx && !lesson.done); });
+}
+function startLesson() {
+  lesson.active = true; lesson.paused = false; lesson.done = false; lesson.bar = 0; lesson.idx = -1;
+  cfg.bpm = 145; setBpm(145);
+  if (running) stopLive();
+  enterCue(0); startLive(); lesson.lastT = ctx.currentTime; lesson.t0 = nextT;
+}
+function exitLesson() { lesson.active = false; focusOn([]); renderLesson(); }
+let lessonFrame = 0;
+function lessonTick() {
+  if (!lesson.active || lesson.done || lesson.paused || !running || !ctx) { if (ctx) lesson.lastT = ctx.currentTime; return; }
+  const now = ctx.currentTime;
+  if (now < lesson.t0) { lesson.lastT = now; return; }
+  lesson.bar += Math.max(0, now - Math.max(lesson.lastT, lesson.t0)) * cfg.bpm / 240; lesson.lastT = now;
+  if (lesson.bar >= LESSON_END) { finishCue(lesson.idx); lesson.done = true; focusOn([]); renderLesson(); return; }
+  let i = 0; while (i < LESSON.length - 1 && lesson.bar >= LESSON[i + 1].bar) i++;
+  if (i !== lesson.idx) { if (lesson.idx >= 0) finishCue(lesson.idx); enterCue(i); }
+  const c = LESSON[i]; lesson.auto = true;
+  (c.ramp || []).forEach(([k, to, bars]) => { const kb = knobs.get(k), u = Math.max(0, Math.min(1, (lesson.bar - c.bar) / (bars || c.len))); kb.setN(lesson.start[k] + (kb.nOf(to) - lesson.start[k]) * ease(u), true); });
+  lesson.auto = false;
+  if (++lessonFrame % 6 === 0) { readout(); updateTrack(); document.getElementById('lLive').textContent = liveLine(); }
+}
+function takeover() { if (lesson.active && !lesson.done && !lesson.auto && !lesson.paused) { lesson.paused = true; renderLesson(); toast(lt('took')); } }
+function drawLessonBand(W, H) {
+  if (!lesson.active) return;
+  const txt = lesson.done ? LESSON_DONE[lang] : LESSON[Math.max(0, lesson.idx)][lang];
+  const BH = H * 0.235;
+  g.fillStyle = COL.panel; g.globalAlpha = 0.94; g.fillRect(0, 0, W, BH); g.globalAlpha = 1;
+  g.fillStyle = COL.line; g.fillRect(0, BH - 4, W, 4);
+  g.fillStyle = COL.ch1; g.fillRect(0, BH - 4, W * Math.min(1, lesson.bar / LESSON_END), 4);
+  g.textAlign = 'left'; g.fillStyle = COL.dim; g.font = '600 24px ' + css('--f-mono');
+  g.fillText((lesson.done ? '✓' : `${lesson.idx + 1}/${LESSON.length}`) + (lesson.paused ? '   ❚❚' : ''), 28, 40);
+  g.fillStyle = COL.ink; g.font = '700 52px ' + css('--f-display'); g.fillText(txt.t, 28, 96);
+  g.font = '500 26px ' + css('--f-body'); g.fillStyle = COL.dim; g.fillText(lesson.done ? '' : (txt.h || ''), 28, 134);
+  g.fillStyle = COL.ch1; g.font = '600 24px ' + css('--f-mono'); g.fillText(liveLine(), 28, 170);
+  g.textAlign = 'left';
+}
+document.getElementById('lessonBtn').onclick = () => lesson.active ? exitLesson() : startLesson();
+document.getElementById('lPause').onclick = () => { lesson.paused = !lesson.paused; if (ctx) lesson.lastT = ctx.currentTime; if (!lesson.paused && lesson.idx >= 0) { const c = LESSON[lesson.idx]; (c.ramp || []).forEach(([k, to, bars]) => { const kb = knobs.get(k), e = ease(Math.max(0, Math.min(1, (lesson.bar - c.bar) / (bars || c.len)))), nt = kb.nOf(to); lesson.start[k] = e < 0.999 ? (kb.n - nt * e) / (1 - e) : kb.n; }); } renderLesson(); };
+document.getElementById('lNext').onclick = () => { if (lesson.idx < 0) return; finishCue(lesson.idx); const nx = LESSON[lesson.idx + 1]; lesson.bar = nx ? nx.bar : LESSON_END; lesson.paused = false; if (nx) enterCue(lesson.idx + 1); else { lesson.done = true; focusOn([]); renderLesson(); } };
+document.getElementById('lExit').onclick = exitLesson;
+
+applyLang(); syncAll(); highlightHear();
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this instrument in teaching or research, please cite it as below."
+title: "Spin Ladder Synth: a two-spin NMR synthesizer for outreach and live performance"
+version: 1.0.0
+date-released: 2026-10-29
+license: MIT
+repository-code: "https://github.com/ioannis75/spin-ladder-synth"
+url: "https://ioannis75.github.io/spin-ladder-synth/"
+authors:
+  - family-names: Theodonis
+    given-names: Ioannis
+    affiliation: "School of Applied Mathematical and Physical Sciences, National Technical University of Athens"
+references:
+  - type: thesis
+    title: "Κβαντική μουσική / Quantum Music Studio"
+    authors:
+      - family-names: Brousali
+        given-names: Panagiota
+    institution:
+      name: "National Technical University of Athens"
+    year: 2026
