@@ -1,0 +1,12 @@
+{
+  "title": "Level 1 (game loop)",
+  "bpm": 150,
+  "seed": 8,
+  "set": { "mode": "chip", "pattern": "gallop", "song": true, "melody": "hook", "chords": "chug", "snare": false,
+           "duty": 0.25, "T2s": 0.08, "T2": 1.2, "e": 0, "p": 0.25, "echoSync": 3, "key": "G",
+           "mkick": 0.8, "mbass": 0.5, "mhat": 0.12, "mlead": 0.4, "mchord": 0.45, "msnare": 0.25 },
+  "sections": [
+    { "name": "explore", "bars": 8 },
+    { "name": "danger", "bars": 8, "set": { "chords": "ring", "snare": true, "duty": 0.5, "e": 0.5, "p": 0 }, "ramp": { "T2s": [0.18, 1], "mchord": [0.8, 1] } }
+  ]
+}

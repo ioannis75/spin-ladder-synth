@@ -126,6 +126,11 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
 .ok { color: var(--ch2); }
 .credit { font-size: 12.5px; color: var(--ink-dim); margin: 0; }
 .toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 20; max-width: calc(100% - 32px); }
+/* ---- επιλογή μαθήματος ---- */
+.lwrap { position: relative; }
+[hidden] { display: none !important; }
+.lmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: grid; gap: 6px; padding: 8px; min-width: min(260px, calc(100vw - 48px)); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.lmenu .btn { text-align: left; }
 /* ---- μάθημα ---- */
 .play.lessonb { border-color: var(--ch2); color: var(--ch2); }
 .play.lessonb[aria-pressed="true"] { background: var(--ch2); color: var(--ground); }
@@ -157,7 +162,8 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
       <p data-i18n="tagline">Δύο σπιν πυρήνων, ένα φίλτρο σκάλας, 145 BPM</p>
     </div>
     <button class="play" id="play" aria-pressed="false"><span class="dot"></span><span data-i18n="play">Παίξε</span></button>
-    <button class="play lessonb" id="lessonBtn" aria-pressed="false"><span data-i18n="lessonBtn">Μάθημα</span></button>
+    <div class="lwrap"><button class="play lessonb" id="lessonBtn" aria-pressed="false" aria-haspopup="true"><span data-i18n="lessonBtn">Μάθημα</span></button>
+      <div class="lmenu" id="lmenu" hidden><button class="btn" data-lesson="phys" data-i18n="lessonPhys">1 · Πώς παίζει η φυσική</button><button class="btn" data-lesson="song" data-i18n="lessonSong">2 · Φτιάξε ένα απλό τραγούδι (8-bit)</button></div></div>
     <div class="bpm"><button class="chip" id="bpmDown" aria-label="−1 BPM">−</button><input id="bpm" type="number" min="90" max="200" value="145" aria-label="BPM"><button class="chip" id="bpmUp" aria-label="+1 BPM">+</button><button class="chip" id="tap">TAP</button></div>
     <div class="seg" role="group" aria-label="Language"><button id="lang-el" aria-pressed="true">ΕΛ</button><button id="lang-en" aria-pressed="false">EN</button></div>
   </header>
@@ -214,6 +220,15 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
         <h2 id="m-mix"><span data-i18n="mMix">Μίξη</span><small data-i18n="mMixS">kick και hat: κλασικά</small></h2>
         <div class="knobs"><div class="knob" data-k="mkick"></div><div class="knob" data-k="mbass"></div><div class="knob" data-k="mhat"></div><div class="knob" data-k="mlead"></div></div>
       </section>
+      <section class="mod" aria-labelledby="m-chip">
+        <h2 id="m-chip"><span data-i18n="mChip">8-bit & τραγούδι</span><small data-i18n="mChipS">φωνές κονσόλας, συγχορδίες, μοτίβο</small></h2>
+        <div class="row"><div class="seg" role="group" id="mode" aria-label="Mode"><button data-m="spin" aria-pressed="true">Spin</button><button data-m="chip" aria-pressed="false">8-bit</button></div>
+          <button class="chip" id="songOn" aria-pressed="false" data-i18n="songOn">Πρόοδος E E F G · E E D F</button></div>
+        <div class="knobs"><div class="knob" data-k="duty"></div><div class="knob" data-k="mchord"></div><div class="knob" data-k="msnare"></div></div>
+        <div class="row"><label for="chords" data-i18n="chordsL">Συγχορδίες</label><select id="chords"><option value="off" data-i18n="off">καμία</option><option value="chug">chug</option><option value="ring">ring</option></select>
+          <label for="melody" data-i18n="melodyL">Μελωδία</label><select id="melody"><option value="born">Born</option><option value="hook">hook</option></select>
+          <button class="chip" id="snare" aria-pressed="false">Snare</button></div>
+      </section>
     </div>
   </section>
 
@@ -242,6 +257,13 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
       <p class="note" data-i18n="tLoopN">Αποδίδει τα τρέχοντα κουμπιά σε μέτρα ακριβή στο δείγμα, με το BPM και το τονικό στο όνομα αρχείου.</p>
       <div class="row"><label for="bars" data-i18n="bars">Μέτρα</label><select id="bars"><option>4</option><option>8</option><option selected>16</option><option>32</option></select><button class="btn" id="loopSave" data-i18n="saveLoop">Αποθήκευση loop</button></div>
       <span class="status" id="loopStatus"></span>
+    </section>
+    <section class="mod">
+      <h2><span data-i18n="tSong">Τραγούδι ή live set</span></h2>
+      <p class="note" data-i18n="tSongN">Ένα τραγούδι είναι ένα αρχείο JSON με ενότητες. Οι ενότητες γίνονται σκηνές (πλήκτρα 1–9) για live χρήση· ο αυτόματος πιλότος το παίζει ολόκληρο. Η ίδια μορφή αποδίδεται από τη γραμμή εντολών και από πράκτορες AI.</p>
+      <div class="row"><select id="songPick" aria-label="Example"><option value="simple">Build a simple song</option><option value="level1">Level 1 (game loop)</option><option value="live">Live set: Spinoras</option></select><button class="btn" id="songLoad" data-i18n="songLoad">Φόρτωση</button><button class="btn" id="songPlay" disabled data-i18n="songPlay">Αυτόματος πιλότος</button></div>
+      <div class="row file"><input type="file" id="songFile" accept=".json,application/json"><button class="btn" id="songClear" disabled data-i18n="clear">Καθαρισμός</button></div>
+      <span class="status" id="songStatus"></span>
     </section>
     <section class="mod">
       <h2><span data-i18n="tFid">FID από το Studio</span></h2>
@@ -309,16 +331,21 @@ C = (1 − 2p) · sin(πe/2)</div>
 <script id="engine">
 /*ENGINE*/
 </script>
+<script id="songlib">
+/*SONG*/
+</script>
 <script>
 (() => {
 'use strict';
 const Q = window.QSynth;
 const VERIFY = /*VERIFY*/;
+const SONGS = /*SONGS*/;
+const SL = window.SpinSong;
 const OFFLINE = /*OFFLINE*/;
 
 /* ================= γλώσσα ================= */
 const EN = {
-  tagline: 'Two nuclear spins, one ladder filter, 145 BPM', play: 'Play', lessonBtn: 'Lesson', stopLive: 'Stop', fullscreen: 'Fullscreen', scenes: 'Scenes',
+  tagline: 'Two nuclear spins, one ladder filter, 145 BPM', play: 'Play', lessonBtn: 'Lesson', lessonPhys: '1 · How the physics plays', lessonSong: '2 · Build a simple song (8-bit)', mChip: '8-bit & song', mChipS: 'console voices, chords, hook', songOn: 'Progression E E F G · E E D F', chordsL: 'Chords', off: 'none', melodyL: 'Melody', tSong: 'Song or live set', tSongN: 'A song is a JSON file of sections. Sections become scenes (keys 1–9) for live use; the autopilot plays it through. The same format renders from the command line and from AI agents.', songLoad: 'Load', songPlay: 'Autopilot', stopLive: 'Stop', fullscreen: 'Fullscreen', scenes: 'Scenes',
   mSpin: 'Spin', mSpinS: 'how it fades and how it beats', mEcho: 'Spin echo', mEchoS: 'π pulse at time τ', echoOn: 'Echo', sync: 'Sync 2τ', free: 'free',
   mLink: 'Link', mLinkS: 'CNOT gate and partner temperature', basis: 'Readout basis', mLad: 'Ladder filter', mLadS: '4 poles, −24 dB/octave',
   mGroove: 'Groove', mGrooveS: 'the Born rule picks the notes', pattern: 'Pattern', noDrums: 'no drums', root: 'Key', tuning: 'Tuning', tet: '12-TET, A4 = 435 Hz',
@@ -377,7 +404,10 @@ const KDEF = {
   mkick: { el: 'Kick', en: 'Kick', min: 0, max: 1.2, get: () => cfg.mix.kick, set: v => { cfg.mix.kick = v; }, fmt: v => num(v, 2) },
   mbass: { el: 'Μπάσο', en: 'Bass', min: 0, max: 1.2, get: () => cfg.mix.bass, set: v => { cfg.mix.bass = v; }, fmt: v => num(v, 2) },
   mhat: { el: 'Hat', en: 'Hat', min: 0, max: 0.5, get: () => cfg.mix.hat, set: v => { cfg.mix.hat = v; }, fmt: v => num(v, 2) },
-  mlead: { el: 'Lead', en: 'Lead', min: 0, max: 1, get: () => cfg.mix.lead, set: v => { cfg.mix.lead = v; }, fmt: v => num(v, 2) }
+  mlead: { el: 'Lead', en: 'Lead', min: 0, max: 1, get: () => cfg.mix.lead, set: v => { cfg.mix.lead = v; }, fmt: v => num(v, 2) },
+  duty: { el: 'Εύρος παλμού', en: 'Pulse width', min: 0.125, max: 0.5, get: () => cfg.duty, set: v => { cfg.duty = v; }, fmt: v => num(v * 100, 1) + '%' },
+  mchord: { el: 'Συγχορδίες', en: 'Chords', min: 0, max: 1.2, get: () => cfg.mix.chord, set: v => { cfg.mix.chord = v; }, fmt: v => num(v, 2) },
+  msnare: { el: 'Snare', en: 'Snare', min: 0, max: 0.8, get: () => cfg.mix.snare, set: v => { cfg.mix.snare = v; }, fmt: v => num(v, 2) }
 };
 function ms(v) { return v < 1 ? num(v * 1000, v < 0.01 ? 1 : 0) + ' ms' : num(v, 2) + ' s'; }
 const knobs = new Map();
@@ -413,7 +443,7 @@ function makeKnob(host) {
   k.host = host; knobs.set(key, k); k.relabel();
 }
 document.querySelectorAll('.knob').forEach(makeKnob);
-function syncAll() { knobs.forEach(k => k.sync()); document.getElementById('echo').setAttribute('aria-pressed', cfg.phys.echo || cfg.echoSync > 0); document.getElementById('sync').value = cfg.echoSync; document.querySelectorAll('#basis button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === cfg.basis)); document.getElementById('pattern').value = cfg.pattern; document.getElementById('root').value = cfg.rootMidi; document.getElementById('tuning').value = cfg.tuning; document.getElementById('seed').value = cfg.seed; document.getElementById('bpm').value = cfg.bpm; document.documentElement.style.setProperty('--bpm', cfg.bpm); readout(); }
+function syncAll() { knobs.forEach(k => k.sync()); document.getElementById('echo').setAttribute('aria-pressed', cfg.phys.echo || cfg.echoSync > 0); document.getElementById('sync').value = cfg.echoSync; document.querySelectorAll('#basis button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === cfg.basis)); document.getElementById('pattern').value = cfg.pattern; document.getElementById('root').value = cfg.rootMidi; document.getElementById('tuning').value = cfg.tuning; document.getElementById('seed').value = cfg.seed; document.querySelectorAll('#mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === cfg.mode)); document.getElementById('songOn').setAttribute('aria-pressed', !!cfg.song); document.getElementById('snare').setAttribute('aria-pressed', !!cfg.snare); document.getElementById('chords').value = cfg.chords; document.getElementById('melody').value = cfg.melody; document.getElementById('bpm').value = cfg.bpm; document.documentElement.style.setProperty('--bpm', cfg.bpm); readout(); }
 function changed(key) { takeover(); readout(); highlightHear(); }
 
 /* ================= σκηνές ================= */
@@ -426,9 +456,17 @@ const SCENES = [
 ];
 function buildScenes() {
   const box = document.getElementById('scenes'); box.querySelectorAll('button').forEach(b => b.remove());
+  if (loaded) { loaded.cues.forEach((c, i) => { const b = document.createElement('button'); b.className = 'chip'; b.innerHTML = `${c.label}${i < 9 ? '<kbd>' + (i + 1) + '</kbd>' : ''}`; b.onclick = () => setScene(i); box.appendChild(b); }); return; }
   SCENES.forEach((s, i) => { const b = document.createElement('button'); b.className = 'chip'; b.innerHTML = `${lang === 'en' ? s.en : s.el}<kbd>${i + 1}</kbd>`; b.onclick = () => scene(i); box.appendChild(b); });
 }
-function scene(i) { takeover(); const s = SCENES[i]; if (i !== 4) { cfg.tuning = 'tet'; if (cfg.pattern === 'half') cfg.pattern = 'rolling'; } s.set(cfg); refreshPrep(); syncAll(); highlightHear(); toast((lang === 'en' ? s.en : s.el)); }
+let loaded = null;   // { spec, cues } of a loaded song or live set
+/* scene i of a loaded set = the state at the start of section i (everything set before it, ramps finished) */
+function setScene(i) {
+  takeover();
+  for (let k = 0; k <= i; k++) { const c = loaded.cues[k]; if (c.jump) for (const n in c.jump) knobs.get(n).setV(c.jump[n]); applySet(c.set); if (k < i) (c.ramp || []).forEach(([n, to]) => knobs.get(n).setV(to)); }
+  refreshPrep(); syncAll(); highlightHear(); toast(loaded.cues[i].label);
+}
+function scene(i) { if (loaded) return setScene(i); takeover(); const s = SCENES[i]; if (i !== 4) { cfg.tuning = 'tet'; if (cfg.pattern === 'half') cfg.pattern = 'rolling'; } s.set(cfg); refreshPrep(); syncAll(); highlightHear(); toast((lang === 'en' ? s.en : s.el)); }
 
 /* ================= ενδείξεις ================= */
 function readout() {
@@ -566,7 +604,7 @@ document.getElementById('dice').onclick = () => { cfg.seed = Math.floor(Math.ran
 document.addEventListener('keydown', e => {
   if (e.target.closest('input, select, textarea')) return;
   if (e.code === 'Space') { e.preventDefault(); running ? stopLive() : startLive(); }
-  const n = +e.key; if (n >= 1 && n <= SCENES.length) scene(n - 1);
+  const n = +e.key; if (n >= 1 && n <= (loaded ? Math.min(9, loaded.cues.length) : SCENES.length)) scene(n - 1);
 });
 
 /* ================= σύνθεση ================= */
@@ -711,10 +749,10 @@ const fmtV = v => typeof v === 'number' ? (Math.abs(v) < 1e-6 && v !== 0 ? v.toE
 function toast(t) { const n = document.getElementById('toast'); n.textContent = t; n.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { n.hidden = true; }, 1600); }
 
 /* ================= μάθημα: αυτόματος πιλότος 96 μέτρων ================= */
-const LESSON = [
+const LESSON_PHYS = [
   { bar: 0, len: 8, focus: ['stage'],
     jump: { T2s: 0.3, T2: 1.2, J: 2, S: 1, tau: 0.05, e: 0, p: 0.25, bright: 2.5, kKnob: 1.6, bassBright: 2.2, density: 0.55, leadOct: 3, mkick: 0, mbass: 0, mhat: 0, mlead: 0.45 },
-    set: { pattern: 'none', echo: false, echoSync: 0, basis: 'Z', tuning: 'tet', hold: 2 },
+    set: { pattern: 'none', echo: false, echoSync: 0, basis: 'Z', tuning: 'tet', hold: 2, mode: 'spin', song: false, melody: 'born', chords: 'off', snare: false },
     el: { t: 'Ένα σπιν, μία νότα', h: 'Κοίτα το κεχριμπαρί βέλος σε κάθε νότα', x: 'Κάθε νότα του lead είναι ένας πυρήνας που γυρίζει. Το κεχριμπαρί βέλος είναι η μαγνήτισή του: όσο γυρίζει ακούς τόνο, όσο μικραίνει ο ήχος σβήνει.' },
     en: { t: 'One spin, one note', h: 'Watch the amber arrow on every note', x: 'Every lead note is a nucleus precessing. The amber arrow is its magnetisation: while it turns you hear a tone, as it shrinks the sound fades.' } },
   { bar: 8, len: 8, focus: ['T2s'], ramp: [['T2s', 0.035, 6]],
@@ -748,7 +786,19 @@ const LESSON = [
     el: { t: 'Λύσε τη σύνδεση', h: 'CNOT 180° → 80°: επιστρέφουν τα τρίτονα', x: 'Η CNOT χαλαρώνει: το βέλος μεγαλώνει ξανά, ο συντονισμός πέφτει και τα τρίτονα γυρίζουν στη μελωδία. Από εδώ, η σκηνή είναι δική σου.' },
     en: { t: 'Release the link', h: 'CNOT 180° → 80°: the tritones return', x: 'The CNOT loosens: the arrow grows again, the resonance drops and the tritones come back into the melody. From here the scene is yours.' } }
 ];
-const LESSON_END = 96;
+let LESSON = LESSON_PHYS, LESSON_END = 96;
+/* a song spec (JSON) → lesson cues: knob values jump, switches are set, knob ramps run over bars */
+function specToCues(spec) {
+  let bar = 0;
+  return spec.sections.map((sec, i) => {
+    const all = Object.assign({}, i === 0 ? spec.set : {}, sec.set), jump = {}, set = {};
+    for (const k in all) (KDEF[k] ? jump : set)[k] = all[k];
+    const name = sec.name || ('§' + (i + 1));
+    const c = { bar, len: sec.bars, jump, set, focus: sec.focus || [], ramp: Object.entries(sec.ramp || {}).map(([k, r]) => [k, r[0], r[1]]),
+      el: sec.el || { t: name, h: '', x: '' }, en: sec.en || { t: name, h: '', x: '' }, label: name };
+    bar += sec.bars; return c;
+  });
+}
 const LESSON_DONE = { el: { t: 'Σειρά σου', x: 'Το μάθημα τελείωσε, η μουσική συνεχίζει. Πλήκτρα 1–5: σκηνές. Space: στοπ. Γύρνα οποιοδήποτε κουμπί.' },
   en: { t: 'Your turn', x: 'The lesson is over; the music keeps going. Keys 1–5: scenes. Space: stop. Turn any knob.' } };
 const lesson = { active: false, paused: false, done: false, bar: 0, idx: -1, start: {}, lastT: 0, auto: false };
@@ -765,6 +815,9 @@ function applySet(s) {
   if ('basis' in s) cfg.basis = s.basis;
   if ('tuning' in s) cfg.tuning = s.tuning;
   if ('hold' in s) cfg.hold = s.hold;
+  for (const k of ['mode', 'song', 'melody', 'chords', 'snare']) if (k in s) cfg[k] = s[k];
+  if ('key' in s && SL.KEY_MIDI[s.key] != null) cfg.rootMidi = SL.KEY_MIDI[s.key];
+  if ('T1' in s) cfg.phys.T1 = s.T1;
 }
 function enterCue(i) {
   const c = LESSON[i]; lesson.idx = i; lesson.auto = true;
@@ -808,9 +861,15 @@ function renderLesson() {
 function updateTrack() {
   [...document.getElementById('lTrack').children].forEach((s, i) => { const c = LESSON[i]; const u = Math.max(0, Math.min(1, (lesson.bar - c.bar) / c.len)); s.firstChild.style.width = (u * 100) + '%'; s.classList.toggle('now', i === lesson.idx && !lesson.done); });
 }
-function startLesson() {
+function startLesson(kind) {
+  if (kind === 'song') { LESSON = specToCues(SONGS.simple); LESSON_END = LESSON.reduce((a, c) => a + c.len, 0); }
+  else if (kind === 'set' && loaded) { LESSON = loaded.cues; LESSON_END = LESSON.reduce((a, c) => a + c.len, 0); }
+  else { LESSON = LESSON_PHYS; LESSON_END = 96; }
+  document.getElementById('lTrack').innerHTML = '';
+  document.getElementById('lmenu').hidden = true;
   lesson.active = true; lesson.paused = false; lesson.done = false; lesson.bar = 0; lesson.idx = -1;
-  cfg.bpm = 145; setBpm(145);
+  const bpm = kind === 'song' ? (SONGS.simple.bpm || 145) : kind === 'set' && loaded ? (loaded.spec.bpm || 145) : 145;
+  cfg.bpm = bpm; setBpm(bpm);
   if (running) stopLive();
   enterCue(0); startLive(); lesson.lastT = ctx.currentTime; lesson.t0 = nextT;
 }
@@ -844,7 +903,31 @@ function drawLessonBand(W, H) {
   g.fillStyle = COL.ch1; g.font = '600 24px ' + css('--f-mono'); g.fillText(liveLine(), 28, 170);
   g.textAlign = 'left';
 }
-document.getElementById('lessonBtn').onclick = () => lesson.active ? exitLesson() : startLesson();
+document.getElementById('lessonBtn').onclick = () => { if (lesson.active) return exitLesson(); const m = document.getElementById('lmenu'); m.hidden = !m.hidden; };
+document.querySelectorAll('#lmenu [data-lesson]').forEach(b => b.onclick = () => startLesson(b.dataset.lesson));
+document.addEventListener('click', ev => { const m = document.getElementById('lmenu'); if (!m.hidden && !ev.target.closest('.lwrap')) m.hidden = true; });
+/* ---- new controls: 8-bit & song ---- */
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => { takeover(); cfg.mode = b.dataset.m; syncAll(); });
+document.getElementById('songOn').onclick = () => { takeover(); cfg.song = !cfg.song; syncAll(); };
+document.getElementById('snare').onclick = () => { takeover(); cfg.snare = !cfg.snare; syncAll(); };
+document.getElementById('chords').onchange = e => { takeover(); cfg.chords = e.target.value; };
+document.getElementById('melody').onchange = e => { takeover(); cfg.melody = e.target.value; };
+/* ---- songs and live sets ---- */
+function useSpec(spec, from) {
+  const v = SL.validate(spec), st = document.getElementById('songStatus');
+  if (!v.ok) { st.textContent = (lang === 'en' ? 'Not loaded: ' : 'Δεν φορτώθηκε: ') + v.errors.slice(0, 3).join(' · '); return; }
+  loaded = { spec, cues: specToCues(spec) };
+  buildScenes(); setScene(0);
+  st.textContent = `${spec.title || from} · ${v.bars} ${lang === 'en' ? 'bars' : 'μέτρα'} · ${loaded.cues.length} ${lang === 'en' ? 'scenes' : 'σκηνές'}`;
+  document.getElementById('songPlay').disabled = false; document.getElementById('songClear').disabled = false;
+}
+document.getElementById('songLoad').onclick = () => { const k = document.getElementById('songPick').value; useSpec(JSON.parse(JSON.stringify(SONGS[k])), k); };
+document.getElementById('songFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { useSpec(JSON.parse(await f.text()), f.name); } catch (err) { document.getElementById('songStatus').textContent = lang === 'en' ? 'This file is not valid JSON.' : 'Το αρχείο δεν είναι έγκυρο JSON.'; }
+};
+document.getElementById('songClear').onclick = () => { loaded = null; buildScenes(); document.getElementById('songStatus').textContent = ''; document.getElementById('songPlay').disabled = true; document.getElementById('songClear').disabled = true; document.getElementById('songFile').value = ''; };
+document.getElementById('songPlay').onclick = () => startLesson('set');
 document.getElementById('lPause').onclick = () => { lesson.paused = !lesson.paused; if (ctx) lesson.lastT = ctx.currentTime; if (!lesson.paused && lesson.idx >= 0) { const c = LESSON[lesson.idx]; (c.ramp || []).forEach(([k, to, bars]) => { const kb = knobs.get(k), e = ease(Math.max(0, Math.min(1, (lesson.bar - c.bar) / (bars || c.len)))), nt = kb.nOf(to); lesson.start[k] = e < 0.999 ? (kb.n - nt * e) / (1 - e) : kb.n; }); } renderLesson(); };
 document.getElementById('lNext').onclick = () => { if (lesson.idx < 0) return; finishCue(lesson.idx); const nx = LESSON[lesson.idx + 1]; lesson.bar = nx ? nx.bar : LESSON_END; lesson.paused = false; if (nx) enterCue(lesson.idx + 1); else { lesson.done = true; focusOn([]); renderLesson(); } };
 document.getElementById('lExit').onclick = exitLesson;

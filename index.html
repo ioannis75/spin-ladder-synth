@@ -128,6 +128,11 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
 .ok { color: var(--ch2); }
 .credit { font-size: 12.5px; color: var(--ink-dim); margin: 0; }
 .toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 20; max-width: calc(100% - 32px); }
+/* ---- επιλογή μαθήματος ---- */
+.lwrap { position: relative; }
+[hidden] { display: none !important; }
+.lmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: grid; gap: 6px; padding: 8px; min-width: min(260px, calc(100vw - 48px)); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.lmenu .btn { text-align: left; }
 /* ---- μάθημα ---- */
 .play.lessonb { border-color: var(--ch2); color: var(--ch2); }
 .play.lessonb[aria-pressed="true"] { background: var(--ch2); color: var(--ground); }
@@ -159,7 +164,8 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
       <p data-i18n="tagline">Δύο σπιν πυρήνων, ένα φίλτρο σκάλας, 145 BPM</p>
     </div>
     <button class="play" id="play" aria-pressed="false"><span class="dot"></span><span data-i18n="play">Παίξε</span></button>
-    <button class="play lessonb" id="lessonBtn" aria-pressed="false"><span data-i18n="lessonBtn">Μάθημα</span></button>
+    <div class="lwrap"><button class="play lessonb" id="lessonBtn" aria-pressed="false" aria-haspopup="true"><span data-i18n="lessonBtn">Μάθημα</span></button>
+      <div class="lmenu" id="lmenu" hidden><button class="btn" data-lesson="phys" data-i18n="lessonPhys">1 · Πώς παίζει η φυσική</button><button class="btn" data-lesson="song" data-i18n="lessonSong">2 · Φτιάξε ένα απλό τραγούδι (8-bit)</button></div></div>
     <div class="bpm"><button class="chip" id="bpmDown" aria-label="−1 BPM">−</button><input id="bpm" type="number" min="90" max="200" value="145" aria-label="BPM"><button class="chip" id="bpmUp" aria-label="+1 BPM">+</button><button class="chip" id="tap">TAP</button></div>
     <div class="seg" role="group" aria-label="Language"><button id="lang-el" aria-pressed="true">ΕΛ</button><button id="lang-en" aria-pressed="false">EN</button></div>
   </header>
@@ -216,6 +222,15 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
         <h2 id="m-mix"><span data-i18n="mMix">Μίξη</span><small data-i18n="mMixS">kick και hat: κλασικά</small></h2>
         <div class="knobs"><div class="knob" data-k="mkick"></div><div class="knob" data-k="mbass"></div><div class="knob" data-k="mhat"></div><div class="knob" data-k="mlead"></div></div>
       </section>
+      <section class="mod" aria-labelledby="m-chip">
+        <h2 id="m-chip"><span data-i18n="mChip">8-bit & τραγούδι</span><small data-i18n="mChipS">φωνές κονσόλας, συγχορδίες, μοτίβο</small></h2>
+        <div class="row"><div class="seg" role="group" id="mode" aria-label="Mode"><button data-m="spin" aria-pressed="true">Spin</button><button data-m="chip" aria-pressed="false">8-bit</button></div>
+          <button class="chip" id="songOn" aria-pressed="false" data-i18n="songOn">Πρόοδος E E F G · E E D F</button></div>
+        <div class="knobs"><div class="knob" data-k="duty"></div><div class="knob" data-k="mchord"></div><div class="knob" data-k="msnare"></div></div>
+        <div class="row"><label for="chords" data-i18n="chordsL">Συγχορδίες</label><select id="chords"><option value="off" data-i18n="off">καμία</option><option value="chug">chug</option><option value="ring">ring</option></select>
+          <label for="melody" data-i18n="melodyL">Μελωδία</label><select id="melody"><option value="born">Born</option><option value="hook">hook</option></select>
+          <button class="chip" id="snare" aria-pressed="false">Snare</button></div>
+      </section>
     </div>
   </section>
 
@@ -244,6 +259,13 @@ details.hood summary { cursor: pointer; font-family: var(--f-display); font-weig
       <p class="note" data-i18n="tLoopN">Αποδίδει τα τρέχοντα κουμπιά σε μέτρα ακριβή στο δείγμα, με το BPM και το τονικό στο όνομα αρχείου.</p>
       <div class="row"><label for="bars" data-i18n="bars">Μέτρα</label><select id="bars"><option>4</option><option>8</option><option selected>16</option><option>32</option></select><button class="btn" id="loopSave" data-i18n="saveLoop">Αποθήκευση loop</button></div>
       <span class="status" id="loopStatus"></span>
+    </section>
+    <section class="mod">
+      <h2><span data-i18n="tSong">Τραγούδι ή live set</span></h2>
+      <p class="note" data-i18n="tSongN">Ένα τραγούδι είναι ένα αρχείο JSON με ενότητες. Οι ενότητες γίνονται σκηνές (πλήκτρα 1–9) για live χρήση· ο αυτόματος πιλότος το παίζει ολόκληρο. Η ίδια μορφή αποδίδεται από τη γραμμή εντολών και από πράκτορες AI.</p>
+      <div class="row"><select id="songPick" aria-label="Example"><option value="simple">Build a simple song</option><option value="level1">Level 1 (game loop)</option><option value="live">Live set: Spinoras</option></select><button class="btn" id="songLoad" data-i18n="songLoad">Φόρτωση</button><button class="btn" id="songPlay" disabled data-i18n="songPlay">Αυτόματος πιλότος</button></div>
+      <div class="row file"><input type="file" id="songFile" accept=".json,application/json"><button class="btn" id="songClear" disabled data-i18n="clear">Καθαρισμός</button></div>
+      <span class="status" id="songStatus"></span>
     </section>
     <section class="mod">
       <h2><span data-i18n="tFid">FID από το Studio</span></h2>
@@ -571,6 +593,92 @@ C = (1 − 2p) · sin(πe/2)</div>
     return out;
   }
 
+  /* ---------- λειτουργία 8-bit: φωνές τύπου NES με περιβάλλουσες από το μοντέλο σπιν ----------
+     Παλμός (polyBLEP, κβαντισμένη περίοδος 2A03), τριγωνικό 32 βημάτων, θόρυβος LFSR 15 bit,
+     ένταση 4 bit που ανανεώνεται στα 240 Hz. Η περιβάλλουσα κάθε νότας είναι |s(t)| του σπιν. */
+  const CPU = 1789773, FRAME = 240;
+  const pulseHz = f => { const t = Math.max(8, Math.round(CPU / (16 * f)) - 1); return CPU / (16 * (t + 1)); };
+  const triHz = f => { const t = Math.max(2, Math.round(CPU / (32 * f)) - 1); return CPU / (32 * (t + 1)); };
+  const q4 = v => Math.round(Math.max(0, Math.min(1, v)) * 15) / 15;
+  function blep(t, dt) { if (t < dt) { t /= dt; return t + t - t * t - 1; } if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+  function spinEnv(prep, A, q, dur) {
+    const nF = Math.ceil(dur * FRAME) + 1, env = new Float32Array(nF);
+    for (let k = 0; k < nF; k++) { const s = signalAt(prep, A, q, k / FRAME); env[k] = q4(Math.min(1, Math.hypot(s.re, s.im))); }
+    return env;
+  }
+  function chipPulse(o, fs) {   // o: freq (ή πίνακας για arpeggio 60 Hz), dur, duty, gain, env
+    const n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n);
+    const fr = (Array.isArray(o.freq) ? o.freq : [o.freq]).map(pulseHz), duty = o.duty || 0.5; let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / fs, f = fr[Math.floor(t * 60) % fr.length], dt = f / fs;
+      const e = o.env[Math.min(Math.floor(t * FRAME), o.env.length - 1)];
+      const v = (ph < duty ? 1 : -1) + blep(ph, dt) - blep((ph - duty + 1) % 1, dt) - (2 * duty - 1);
+      out[i] = o.gain * e * v * Math.min(1, (o.dur - t) / 0.004, t / 0.001);
+      ph += dt; if (ph >= 1) ph -= 1;
+    }
+    return out;
+  }
+  const TRI = Array.from({ length: 32 }, (_, i) => (i < 16 ? 15 - i : i - 16) / 7.5 - 1);
+  function chipTri(o, fs) {     // o: freq ή sweep(t), dur, gain, gate(t)
+    const n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n); let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / fs, f = triHz(o.sweep ? o.sweep(t) : o.freq);
+      out[i] = o.gain * (o.gate ? o.gate(t) : 1) * TRI[Math.floor(ph * 32) % 32] * Math.min(1, (o.dur - t) / 0.003);
+      ph += f / fs; if (ph >= 1) ph -= 1;
+    }
+    return out;
+  }
+  const NOISE_P = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
+  function chipNoise(o, fs) {   // o: dur, period, short, decay, gain
+    const n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n), clk = CPU / NOISE_P[o.period || 0] / fs;
+    let lfsr = 1, acc = 0;
+    for (let i = 0; i < n; i++) {
+      acc += clk; while (acc >= 1) { acc -= 1; const fb = (lfsr ^ (lfsr >> (o.short ? 6 : 1))) & 1; lfsr = (lfsr >> 1) | (fb << 14); }
+      const t = i / fs, k = Math.floor(t * FRAME) / FRAME;
+      out[i] = o.gain * q4(Math.exp(-k / o.decay)) * ((lfsr & 1) ? -1 : 1) * Math.min(1, (o.dur - t) / 0.003);
+    }
+    return out;
+  }
+  function chipKick(o, fs) {
+    const a = chipTri({ dur: 0.26, gain: o.gain, sweep: t => 46 + 160 * Math.exp(-t / 0.03), gate: t => q4(Math.exp(-t / 0.16)) }, fs);
+    const c = chipNoise({ dur: 0.012, period: 0, decay: 0.004, gain: o.gain * 0.5 }, fs);
+    for (let i = 0; i < c.length; i++) a[i] += c[i];
+    for (let i = 0; i < a.length; i++) a[i] = Math.tanh(1.4 * a[i]);
+    return a;
+  }
+  function chipSnare(o, fs) {
+    const a = chipNoise({ dur: 0.2, period: 6, decay: 0.07, gain: o.gain }, fs);
+    const b = chipTri({ dur: 0.05, gain: o.gain * 0.8, sweep: t => 190 - 900 * t }, fs);
+    for (let i = 0; i < b.length; i++) a[i] += b[i];
+    return a;
+  }
+  /* power chord (θεμέλιο + πέμπτη + οκτάβα) → fuzz tanh → φίλτρο σκάλας: cutoff από |s(t)|, συντονισμός από C */
+  function renderPower(o, fs) {
+    const env = spinEnv(o.prep, o.A, 0, o.dur), n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n);
+    const parts = [0, 7, 12].map((iv, j) => o.chip
+      ? chipPulse({ freq: midiHz(o.root + iv), dur: o.dur, duty: j === 1 ? 0.25 : (o.duty || 0.5), gain: 1, env }, fs)
+      : renderSpinVoice({ freq: midiHz(o.root + iv), dur: o.dur, prep: o.prep, A: o.A, q: 0, bright: 0, kKnob: 0, gain: 1, filter: false }, fs));
+    const lad = new Ladder(fs), k = 1.2 * (1 - o.prep.C) + 3.6 * o.prep.C;
+    for (let i = 0; i < n; i++) {
+      const x = Math.tanh((o.drive || 5) * (parts[0][i] + parts[1][i] + 0.6 * parts[2][i]) / 2.6);
+      const e = env[Math.min(Math.floor(i / fs * FRAME), env.length - 1)];
+      out[i] = o.gain * lad.process(x, (o.base || 240) * Math.pow(2, (o.bright || 3) * e), k, true);
+    }
+    return out;
+  }
+
+  /* ---------- μορφή τραγουδιού: αρμονική πρόοδος και μελωδικό μοτίβο (πρωτότυπα, Ε φρύγιος) ----------
+     PROG: μετατόπιση της ρίζας ανά μέτρο (κύκλος 8 μέτρων): E E F G | E E D F
+     HOOK: δύο φράσεις 2 μέτρων στο πλέγμα των 16ων [βήμα, ημιτόνια από τη ρίζα, διάρκεια]·
+     ο κανόνας Born διαλέγει φράση κάθε 2 μέτρα: 00 → A, 01 → B, 10 → B μία οκτάβα κάτω, 11 → A μία οκτάβα πάνω */
+  const PROG = [0, 0, 1, 3, 0, 0, -2, 1];
+  const HOOK = {
+    A: [[0, 12, 3], [3, 7, 1], [4, 8, 2], [6, 7, 2], [8, 3, 2], [10, 1, 2], [12, 0, 4], [16, 0, 2], [18, 3, 2], [20, 5, 2], [22, 7, 1], [23, 8, 1], [24, 7, 3], [27, 1, 1], [28, 0, 4]],
+    B: [[0, 0, 2], [2, 1, 1], [3, 3, 1], [4, 5, 4], [8, 8, 2], [10, 7, 2], [12, 5, 2], [14, 3, 2], [16, 1, 3], [19, 0, 1], [20, 1, 2], [22, 3, 2], [24, 0, 8]]
+  };
+  const HOOK_PICK = [['A', 0], ['B', 0], ['B', -12], ['A', 12]];
+  function bornOutcome(prep, basis, u) { const P = probs(prep.rho, basis); let o = 0; while (o < 3 && u > P[o]) { u -= P[o]; o++; } return o; }
+
   /* ---------- αλληλουχητής psytrance ----------
      Μπάσο: ίδια φυσική χαλάρωσης, αλλά πάντα χωρίς πύλη σύνδεσης (e = 0), ώστε να μη σβήνει. */
   const OUTCOME_SEMIS = [0, 6, -6, 12];   // 00 → θεμέλιο, 01/10 → τρίτονο (διαφωνία), 11 → οκτάβα (συμφωνία)
@@ -587,7 +695,9 @@ C = (1 − 2p) · sin(πe/2)</div>
       e: 0, p: 0.25, basis: 'Z',
       bpm: 145, rootMidi: 28 /* E1 στο A4=435 */, pattern: 'rolling', density: 0.8, seed: 271828,
       leadOct: 3, bright: 3.5, kKnob: 2.6, bassBright: 2.2,
-      mix: { kick: 0.9, bass: 0.6, hat: 0.14, lead: 0.32 }, tuning: 'tet', echoSync: 0
+      mix: { kick: 0.9, bass: 0.6, hat: 0.14, lead: 0.32, chord: 0.5, snare: 0.3 }, tuning: 'tet', echoSync: 0,
+      // προσθήκες: λειτουργία 8-bit και μορφή τραγουδιού (όλα κλειστά = η αρχική συμπεριφορά)
+      mode: 'spin', duty: 0.5, song: false, melody: 'born', chords: 'off', snare: false
     };
   }
   function stepSeconds(bpm) { return 60 / bpm / 4; }
@@ -608,15 +718,39 @@ C = (1 − 2p) · sin(πe/2)</div>
   /* επιστρέφει τα γεγονότα ενός βήματος (16ου) */
   function stepEvents(cfg, prep, step, t0, rng, fidF, prepBass) {
     const pat = PATTERNS[cfg.pattern] || PATTERNS.rolling, i = step % 16, st = stepSeconds(cfg.bpm);
-    const ph = syncedPhys(cfg), A = toAudio(ph), ev = [];
-    if (pat.kick[i] === '1') ev.push({ t: t0, kind: 'kick', gain: cfg.mix.kick });
-    if (pat.hat[i] === '1') ev.push({ t: t0, kind: 'hat', gain: cfg.mix.hat, seed: step + 1 });
-    if (pat.bass[i] === '1') ev.push({ t: t0, kind: 'spin', freq: midiHz(cfg.rootMidi), dur: st * 0.92, prep: prepBass || prepare(0, cfg.p), A, q: 0, bright: cfg.bassBright, kKnob: 1.2, gain: cfg.mix.bass, exciter: 0, drive: 1.4 });
-    if (pat.lead[i] === '1' && rng() < cfg.density) {
+    const ph = syncedPhys(cfg), A = toAudio(ph), ev = [], chip = cfg.mode === 'chip';
+    const mix = Object.assign({ chord: 0.5, snare: 0.3 }, cfg.mix);
+    const bar = Math.floor(step / 16), off = cfg.song ? PROG[bar % 8] : 0, root = cfg.rootMidi + off;
+    const pB = prepBass || prepare(0, cfg.p);
+    if (pat.kick[i] === '1') ev.push({ t: t0, kind: chip ? 'ckick' : 'kick', gain: mix.kick, voice: 'drums' });
+    if (pat.hat[i] === '1') ev.push(chip ? { t: t0, kind: 'cnoise', dur: 0.05, period: 1, short: true, decay: 0.014, gain: mix.hat, pan: 0.2, voice: 'drums' }
+                                         : { t: t0, kind: 'hat', gain: mix.hat, seed: step + 1, voice: 'drums' });
+    if (cfg.snare && (i === 4 || i === 12)) ev.push({ t: t0, kind: 'csnare', gain: mix.snare, voice: 'drums' });
+    if (pat.bass[i] === '1') ev.push(chip
+      ? { t: t0, kind: 'ctri', freq: midiHz(root + 12), dur: st * 0.92, gain: mix.bass * 0.9, gateEnv: spinEnv(pB, A, 0, st), voice: 'bass' }
+      : { t: t0, kind: 'spin', freq: midiHz(root), dur: st * 0.92, prep: pB, A, q: 0, bright: cfg.bassBright, kKnob: 1.2, gain: mix.bass, exciter: 0, drive: 1.4, voice: 'bass' });
+    // power chords: «chug» = 16α με παλάμη (σύντομο T2*), «ring» = μία συγχορδία ανά μέτρο που αντηχεί
+    if (cfg.chords === 'chug' && [0, 2, 3, 6, 8, 10, 11, 14].includes(i))
+      ev.push({ t: t0, kind: 'power', chip, root: root + 24, dur: st * 1.5, prep: prepare(0, 0), A: toAudio({ J: 0, nu0: 0, nu1: 0, T2: 1, T2s: 0.045, T1: 2, tau: 1, echo: false, S: 1 }), duty: 0.125, gain: mix.chord * 0.6, drive: 3, bright: 1.4, base: 200, pan: i % 4 ? 0.5 : -0.5, voice: 'chords' });
+    if (cfg.chords === 'ring' && i === 0)
+      ev.push({ t: t0, kind: 'power', chip, root: root + 24, dur: 16 * st, prep: prepare(0, 0.15), A: toAudio({ J: 0, nu0: 0, nu1: 0, T2: 6, T2s: 0.8, T1: 8, tau: 1, echo: false, S: 1 }), duty: 0.5, gain: mix.chord, drive: 6, bright: 3.2, base: 240, voice: 'chords' });
+    // μελωδία: «born» = μία μέτρηση ανά νότα (όπως πριν) · «hook» = ο Born διαλέγει φράση κάθε 2 μέτρα
+    let notes = [];
+    if (cfg.melody === 'hook') {
+      const phrase = Math.floor(step / 32), o = bornOutcome(prep, cfg.basis, mulberry32(cfg.seed + 7919 * phrase)());
+      const [name, sh] = HOOK_PICK[o], k = step % 32;
+      HOOK[name].forEach(([s, semi, len]) => { if (s === k) notes.push({ semis: semi + sh + off, len, o }); });
+    } else if (pat.lead[i] === '1' && rng() < cfg.density) {
       const P = probs(prep.rho, cfg.basis); let u = rng(), o = 0; while (o < 3 && u > P[o]) { u -= P[o]; o++; }
-      const dur = Math.min(2.5, Math.max(st * (cfg.hold || 2), A.echo ? 2 * A.tau + 3 * A.T2s : 0));
-      const base = { t: t0, freq: leadFreq(cfg, OUTCOME_SEMIS[o]), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: cfg.mix.lead, outcome: o, pan: (o === 1 ? -0.4 : o === 2 ? 0.4 : 0) };
-      ev.push(fidF ? Object.assign(base, { kind: 'fid', F: fidF, q: 0 }) : Object.assign(base, { kind: 'spin', prep, A, q: 0, exciter: 0.35 }));
+      notes.push({ semis: OUTCOME_SEMIS[o] + off, len: cfg.hold || 2, o });
+    }
+    for (const nt of notes) {
+      const dur = Math.min(2.5, Math.max(st * nt.len, A.echo ? 2 * A.tau + 3 * A.T2s : 0));
+      const base = { t: t0, freq: leadFreq(cfg, nt.semis), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: mix.lead, outcome: nt.o, pan: (nt.o === 1 ? -0.4 : nt.o === 2 ? 0.4 : 0), voice: 'lead' };
+      if (fidF) ev.push(Object.assign(base, { kind: 'fid', F: fidF, q: 0 }));
+      // 8-bit: η νότα είναι το αποτέλεσμα της μέτρησης, παιγμένο από ένα «φρέσκο» σπιν ανάγνωσης (pB)
+      else if (chip) ev.push(Object.assign(base, { kind: 'cpulse', duty: cfg.duty, env: spinEnv(pB, A, 0, dur), gain: mix.lead * 0.7 }));
+      else ev.push(Object.assign(base, { kind: 'spin', prep, A, q: 0, exciter: 0.35 }));
     }
     return ev;
   }
@@ -628,6 +762,12 @@ C = (1 − 2p) · sin(πe/2)</div>
       case 'pop': return renderPopVoice(ev, fs);
       case 'mix': return renderMixture(ev, fs);
       case 'fid': return renderFidVoice(ev, fs);
+      case 'ckick': return chipKick(ev, fs);
+      case 'csnare': return chipSnare(ev, fs);
+      case 'cnoise': return chipNoise(ev, fs);
+      case 'cpulse': return chipPulse(ev, fs);
+      case 'ctri': return chipTri(Object.assign({}, ev, { gate: t => (ev.gateEnv[Math.min(Math.floor(t * FRAME), ev.gateEnv.length - 1)] > 0.3 ? 1 : 0) }), fs);
+      case 'power': return renderPower(ev, fs);
     }
     return new Float32Array(1);
   }
@@ -737,8 +877,213 @@ C = (1 − 2p) · sin(πe/2)</div>
 
   const api = { prepare, describe, concurrence, probs, toAudio, signalAt, populationAt, Ladder, mulberry32, midiHz, studieHz, STUDIE_CENTS, A4,
     renderSpinVoice, renderPopVoice, renderMixture, renderKick, renderHat, renderFidVoice, parseStudioFID, fidAt,
-    PATTERNS, OUTCOME_SEMIS, defaults, stepSeconds, syncedPhys, stepEvents, renderEvent, renderTimeline, grooveEvents, pieceEvents, wav };
+    PATTERNS, OUTCOME_SEMIS, defaults, stepSeconds, syncedPhys, stepEvents, renderEvent, renderTimeline, grooveEvents, pieceEvents, wav,
+    PROG, HOOK, HOOK_PICK, spinEnv, pulseHz, triHz, chipPulse, chipTri, chipNoise, chipKick, chipSnare, renderPower };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.QSynth = api;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script id="songlib">
+/* =====================================================================
+   Spin Ladder — song specs (shared by the CLI, the page's lessons and live sets)
+   A song is JSON: { title, bpm, seed, set, sections: [ { name, bars, set, ramp, el, en, focus } ] }
+   - set:   values applied at the start of the section (knobs and switches, see KNOBS / SWITCHES)
+   - ramp:  { key: [target, overBars] } — the knob moves smoothly to target, like the lesson autopilot
+   Works in the browser (window.SpinSong) and in Node (require).
+   ===================================================================== */
+(function (root) {
+  'use strict';
+  const E = (typeof module !== 'undefined' && module.exports) ? require('./engine.js') : root.QSynth;
+
+  // knob ranges: identical to the instrument's knobs, so a ramp sounds the same in the CLI and the page
+  const KNOBS = {
+    T2s: { min: 0.004, max: 1, log: true, path: ['phys', 'T2s'], unit: 's', doc: 'T2*: how fast each note fades (bell → pluck)' },
+    T2: { min: 0.05, max: 4, log: true, path: ['phys', 'T2'], unit: 's', doc: 'T2: true coherence time; limits the echo height' },
+    J: { min: 0, max: 300, curve: 2.2, path: ['phys', 'J'], unit: 'Hz', doc: 'J coupling: two lines J apart (slow = pulse, fast = two pitches)' },
+    S: { min: 0.25, max: 200, log: true, path: ['phys', 'S'], unit: '×', doc: 'time stretch: audio time = S × physical time' },
+    tau: { min: 0.002, max: 0.5, log: true, path: ['phys', 'tau'], unit: 's', doc: 'echo: π pulse at τ, the note returns at 2τ' },
+    e: { min: 0, max: 1, path: ['e'], unit: '', doc: 'CNOT strength (1 = Bell state when p = 0)' },
+    p: { min: 0, max: 0.5, path: ['p'], unit: '', doc: 'partner temperature (0 cold → entanglement possible, 0.5 hot)' },
+    bright: { min: 0, max: 6, path: ['bright'], unit: 'oct', doc: 'lead filter brightness (spin mode)' },
+    kKnob: { min: 0, max: 3.9, path: ['kKnob'], unit: '', doc: 'ladder resonance (spin mode)' },
+    bassBright: { min: 0, max: 5, path: ['bassBright'], unit: 'oct', doc: 'bass filter brightness (spin mode)' },
+    density: { min: 0, max: 1, path: ['density'], unit: '', doc: 'share of lead steps that play (melody "born")' },
+    leadOct: { min: 1, max: 4, step: 1, path: ['leadOct'], unit: '', doc: 'lead octave above the key root' },
+    duty: { min: 0.125, max: 0.5, path: ['duty'], unit: '', doc: '8-bit pulse width: 0.125 thin, 0.25 nasal, 0.5 square' },
+    mkick: { min: 0, max: 1.2, path: ['mix', 'kick'], unit: '', doc: 'kick level' },
+    mbass: { min: 0, max: 1.2, path: ['mix', 'bass'], unit: '', doc: 'bass level' },
+    mhat: { min: 0, max: 0.5, path: ['mix', 'hat'], unit: '', doc: 'hi-hat level' },
+    mlead: { min: 0, max: 1, path: ['mix', 'lead'], unit: '', doc: 'lead level' },
+    mchord: { min: 0, max: 1.2, path: ['mix', 'chord'], unit: '', doc: 'power-chord level' },
+    msnare: { min: 0, max: 0.8, path: ['mix', 'snare'], unit: '', doc: 'snare level' }
+  };
+  const SWITCHES = {
+    mode: { values: ['spin', 'chip'], doc: 'spin = smooth spin tones through the ladder filter; chip = 8-bit NES-style voices' },
+    pattern: { values: Object.keys(E.PATTERNS), doc: 'drum/bass/lead step pattern' },
+    song: { values: [false, true], doc: 'true = follow the 8-bar progression E E F G | E E D F (relative to the key)' },
+    melody: { values: ['born', 'hook'], doc: 'born = one measurement per note; hook = the Born rule picks a 2-bar phrase' },
+    chords: { values: ['off', 'chug', 'ring'], doc: 'power chords: palm-muted 16ths or one ringing chord per bar' },
+    snare: { values: [false, true], doc: 'snare on beats 2 and 4' },
+    basis: { values: ['Z', 'X', 'Y'], doc: 'measurement basis for the Born rule' },
+    echo: { values: [false, true], doc: 'spin echo on/off' },
+    echoSync: { values: [0, 1, 2, 3, 4], doc: '2τ locked to n sixteenths (0 = free)' },
+    tuning: { values: ['tet', 'studie'], doc: '12-TET at A4 = 435 Hz, or Stockhausen Studie II scale' },
+    hold: { values: 'number of 16ths', doc: 'minimum lead note length' },
+    key: { values: ['E', 'F', 'F#', 'G', 'A', 'D'], doc: 'key root' }
+  };
+  const KEY_MIDI = { E: 28, F: 29, 'F#': 30, G: 31, A: 33, D: 26 };
+
+  const getPath = (o, p) => p.reduce((a, k) => a[k], o);
+  const setPath = (o, p, v) => { const last = p[p.length - 1]; p.slice(0, -1).reduce((a, k) => a[k], o)[last] = v; };
+  const toN = (d, v) => d.log ? Math.log(v / d.min) / Math.log(d.max / d.min) : d.curve ? Math.pow(Math.max(0, (v - d.min) / (d.max - d.min)), 1 / d.curve) : (v - d.min) / (d.max - d.min);
+  const fromN = (d, n) => { n = Math.max(0, Math.min(1, n)); let v = d.log ? d.min * Math.pow(d.max / d.min, n) : d.curve ? d.min + (d.max - d.min) * Math.pow(n, d.curve) : d.min + (d.max - d.min) * n; return d.step ? Math.round(v / d.step) * d.step : v; };
+  const ease = u => u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+
+  function applySet(cfg, set) {
+    for (const k in set || {}) {
+      const v = set[k];
+      if (KNOBS[k]) setPath(cfg, KNOBS[k].path, v);
+      else if (k === 'echo') cfg.phys.echo = !!v;
+      else if (k === 'key') cfg.rootMidi = KEY_MIDI[v] != null ? KEY_MIDI[v] : cfg.rootMidi;
+      else if (k === 'T1') cfg.phys.T1 = v;
+      else cfg[k] = v;
+    }
+    cfg.phys.T2s = Math.min(cfg.phys.T2s, cfg.phys.T2);
+    cfg.phys.T1 = Math.max(cfg.phys.T1, cfg.phys.T2 / 2);
+    if (cfg.echoSync > 0) cfg.phys.echo = true;
+  }
+
+  // spec checks an agent can rely on: unknown keys, out-of-range values, wrong types
+  function validate(spec) {
+    const errs = [], warn = [];
+    if (!spec || !Array.isArray(spec.sections) || !spec.sections.length) errs.push('sections: need a non-empty array');
+    if (spec.bpm != null && !(spec.bpm >= 60 && spec.bpm <= 220)) errs.push('bpm: must be 60–220');
+    const chkSet = (where, set) => {
+      for (const k in set || {}) {
+        const v = set[k];
+        if (KNOBS[k]) { const d = KNOBS[k]; if (typeof v !== 'number' || v < d.min - 1e-9 || v > d.max + 1e-9) errs.push(`${where}.${k}: ${v} outside ${d.min}–${d.max}`); }
+        else if (SWITCHES[k]) { const s = SWITCHES[k]; if (Array.isArray(s.values) && !s.values.includes(v)) errs.push(`${where}.${k}: ${JSON.stringify(v)} not one of ${JSON.stringify(s.values)}`); }
+        else if (k !== 'T1') errs.push(`${where}.${k}: unknown key`);
+      }
+    };
+    chkSet('set', spec.set);
+    (spec.sections || []).forEach((s, i) => {
+      const w = `sections[${i}]${s.name ? ' (' + s.name + ')' : ''}`;
+      if (!(Number.isInteger(s.bars) && s.bars > 0 && s.bars <= 256)) errs.push(`${w}.bars: integer 1–256`);
+      chkSet(w + '.set', s.set);
+      for (const k in s.ramp || {}) {
+        const r = s.ramp[k];
+        if (!KNOBS[k]) errs.push(`${w}.ramp.${k}: only knobs can ramp`);
+        else if (!Array.isArray(r) || typeof r[0] !== 'number' || r[0] < KNOBS[k].min - 1e-9 || r[0] > KNOBS[k].max + 1e-9) errs.push(`${w}.ramp.${k}: [target within ${KNOBS[k].min}–${KNOBS[k].max}, bars]`);
+      }
+    });
+    const bars = (spec.sections || []).reduce((a, s) => a + (s.bars || 0), 0);
+    if (bars > 400) warn.push(`${bars} bars is long (over 11 minutes at 145 BPM)`);
+    return { ok: !errs.length, errors: errs, warnings: warn, bars };
+  }
+
+  // a timeline of sections with absolute bar positions
+  function layout(spec) { let b = 0; return spec.sections.map(s => { const o = Object.assign({}, s, { start: b }); b += s.bars; return o; }); }
+
+  /* all events of a song; `only` keeps one voice group (drums, bass, chords, lead) for stems */
+  function songEvents(spec, opts) {
+    opts = opts || {};
+    const cfg = E.defaults(); if (spec.bpm) cfg.bpm = spec.bpm; if (spec.seed != null) cfg.seed = spec.seed;
+    applySet(cfg, spec.set);
+    const secs = layout(spec), st = E.stepSeconds(cfg.bpm), rng = E.mulberry32(cfg.seed), ev = [], marks = [];
+    let start = {};
+    for (const s of secs) {
+      applySet(cfg, s.set);
+      start = {}; for (const k in s.ramp || {}) start[k] = toN(KNOBS[k], getPath(cfg, KNOBS[k].path));
+      marks.push({ name: s.name || '', t: s.start * 16 * st, bar: s.start });
+      for (let j = 0; j < s.bars * 16; j++) {
+        const barF = j / 16;
+        for (const k in s.ramp || {}) {
+          const [to, over] = s.ramp[k], u = Math.max(0, Math.min(1, barF / (over || s.bars)));
+          setPath(cfg, KNOBS[k].path, fromN(KNOBS[k], start[k] + (toN(KNOBS[k], to) - start[k]) * ease(u)));
+        }
+        cfg.phys.T2s = Math.min(cfg.phys.T2s, cfg.phys.T2);
+        const step = s.start * 16 + j, prep = E.prepare(cfg.e, cfg.p), pB = E.prepare(0, cfg.p);
+        for (const e of E.stepEvents(cfg, prep, step, step * st, rng, null, pB)) if (!opts.only || e.voice === opts.only) ev.push(e);
+      }
+      for (const k in s.ramp || {}) setPath(cfg, KNOBS[k].path, s.ramp[k][0]);
+    }
+    const total = secs.reduce((a, s) => a + s.bars, 0) * 16 * st;
+    return { events: ev, total, marks, bpm: cfg.bpm };
+  }
+
+  /* render: tail = seconds after the end; loop = fold the tail back onto the start (seamless game loop) */
+  function render(spec, opts) {
+    opts = opts || {};
+    const sr = opts.sr || 44100, S = songEvents(spec, opts), tail = opts.loop ? 3 : (opts.tail != null ? opts.tail : 2);
+    const [L, R] = E.renderTimeline(S.events, S.total + tail, sr, opts.onProgress);
+    if (!opts.loop) return { L, R, sr, marks: S.marks, total: S.total + tail };
+    const n = Math.round(S.total * sr), Lo = L.slice(0, n), Ro = R.slice(0, n);
+    for (let i = n; i < L.length; i++) { Lo[i - n] += L[i]; Ro[i - n] += R[i]; }
+    return { L: Lo, R: Ro, sr, marks: S.marks, total: S.total };
+  }
+
+  /* ITU-R BS.1770-4 integrated loudness (K-weighting, 400 ms blocks, absolute and relative gates) */
+  function biquad(x, b, a) {
+    const y = new Float32Array(x.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) { const v = (b[0] * x[i] + b[1] * x1 + b[2] * x2 - a[1] * y1 - a[2] * y2) / a[0]; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v; }
+    return y;
+  }
+  function kWeight(x, sr) {
+    let w = 2 * Math.PI * 1500 / sr, A = Math.pow(10, 4 / 40), al = Math.sin(w) / (2 * Math.SQRT1_2), c = Math.cos(w);
+    const sh = biquad(x, [A * ((A + 1) + (A - 1) * c + 2 * Math.sqrt(A) * al), -2 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - 2 * Math.sqrt(A) * al)],
+      [(A + 1) - (A - 1) * c + 2 * Math.sqrt(A) * al, 2 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - 2 * Math.sqrt(A) * al]);
+    w = 2 * Math.PI * 38 / sr; al = Math.sin(w) / (2 * 0.5); c = Math.cos(w);
+    return biquad(sh, [(1 + c) / 2, -(1 + c), (1 + c) / 2], [1 + al, -2 * c, 1 - al]);
+  }
+  function loudness(L, R, sr) {
+    const kl = kWeight(L, sr), kr = kWeight(R, sr), B = Math.round(0.4 * sr), H = Math.round(0.1 * sr), z = [];
+    for (let s = 0; s + B <= kl.length; s += H) { let a = 0; for (let i = s; i < s + B; i++) a += kl[i] * kl[i] + kr[i] * kr[i]; z.push(a / B); }
+    const lk = m => -0.691 + 10 * Math.log10(m);
+    const abs = z.filter(m => lk(m) > -70); if (!abs.length) return -Infinity;
+    const rel = lk(abs.reduce((a, b) => a + b, 0) / abs.length) - 10;
+    const g = abs.filter(m => lk(m) > rel);
+    return lk(g.reduce((a, b) => a + b, 0) / g.length);
+  }
+  function peakDb(L, R) { let p = 0; for (let i = 0; i < L.length; i++) p = Math.max(p, Math.abs(L[i]), Math.abs(R[i])); return 20 * Math.log10(p || 1e-12); }
+
+  /* master: gain to the target loudness, then a soft limiter with its ceiling at −1 dBFS */
+  function master(L, R, sr, target) {
+    const ceil = Math.pow(10, -1 / 20), thr = 0.8 * ceil;
+    const lim = v => { const a = Math.abs(v); return a <= thr ? v : Math.sign(v) * (thr + (ceil - thr) * Math.tanh((a - thr) / (ceil - thr))); };
+    let g = Math.pow(10, (target - loudness(L, R, sr)) / 20);
+    for (let pass = 0; pass < 2; pass++) {
+      const l2 = L.map(v => lim(v * g)), r2 = R.map(v => lim(v * g)), lu = loudness(l2, r2, sr);
+      if (pass === 1 || Math.abs(lu - target) < 0.2) return { L: l2, R: r2, lufs: lu, gainDb: 20 * Math.log10(g) };
+      g *= Math.pow(10, (target - lu) / 20);
+    }
+  }
+
+  /* a report an agent can read: loudness, peak, per-section level, contrast between loudest and quietest */
+  function report(L, R, sr, marks, total) {
+    const secs = marks.map((m, i) => {
+      const a = Math.round(m.t * sr), b = Math.round((i + 1 < marks.length ? marks[i + 1].t : total) * sr);
+      let s = 0; for (let j = a; j < b && j < L.length; j++) s += L[j] * L[j] + R[j] * R[j];
+      return { name: m.name, startBar: m.bar, rmsDb: +(10 * Math.log10(s / Math.max(1, 2 * (b - a)) + 1e-12)).toFixed(1) };
+    });
+    const r = secs.map(s => s.rmsDb).filter(Number.isFinite);
+    return { seconds: +(L.length / sr).toFixed(2), lufs: +loudness(L, R, sr).toFixed(1), peakDbfs: +peakDb(L, R).toFixed(1), sections: secs, dynamicRangeDb: +(Math.max(...r) - Math.min(...r)).toFixed(1) };
+  }
+
+  function wav24(L, R, sr) {
+    const n = L.length, buf = new ArrayBuffer(44 + n * 6), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 6, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 6, true); v.setUint16(32, 6, true); v.setUint16(34, 24, true); w(36, 'data'); v.setUint32(40, n * 6, true);
+    for (let i = 0, o = 44; i < n; i++) for (const x of [L[i], R[i]]) {
+      const s = Math.round(Math.max(-1, Math.min(1, x)) * 8388607);
+      v.setUint8(o++, s & 255); v.setUint8(o++, (s >> 8) & 255); v.setUint8(o++, (s >> 16) & 255);
+    }
+    return buf;
+  }
+
+  const api = { KNOBS, SWITCHES, KEY_MIDI, applySet, validate, layout, songEvents, render, loudness, peakDb, master, report, wav24, toN, fromN, ease };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SpinSong = api;
 })(typeof self !== 'undefined' ? self : this);
 
 </script>
@@ -949,13 +1294,50 @@ const VERIFY = [
   "got": 0.20689655172413793,
   "dev": 0,
   "ok": true
+ },
+ {
+  "name": "B13 κβάντιση περιόδου 2A03: |Δf|/f για E4",
+  "expected": 0,
+  "got": 0.0007457568100368701,
+  "dev": 0.0007457568100368701,
+  "ok": true
+ },
+ {
+  "name": "B14 περιβάλλουσα 8-bit: αναβίωση ηχούς στο 2τ (4 bit)",
+  "expected": 0.7333333333333333,
+  "got": 0.7333333492279053,
+  "dev": 1.5894571991914574e-8,
+  "ok": true
+ },
+ {
+  "name": "B15 hook σε κατάσταση Bell: μόνο φράσεις A / A+οκτάβα (00, 11)",
+  "expected": "0,3",
+  "got": "0,3",
+  "dev": "",
+  "ok": true
+ },
+ {
+  "name": "B16 πρόοδος: ρίζα μέτρου 3 (G) / μέτρου 1 (E), ημιτόνια",
+  "expected": 3,
+  "got": 2.999999999999999,
+  "dev": 8.881784197001252e-16,
+  "ok": true
+ },
+ {
+  "name": "B17 απόδοση 8-bit + συγχορδίες + snare: πεπερασμένη, χωρίς ψαλιδισμό",
+  "expected": "0 < peak < 1",
+  "got": "0.939",
+  "dev": "",
+  "ok": true
  }
 ];
+const SONGS = {"simple":{"title":"Build a simple song","bpm":145,"seed":2026,"set":{"mode":"chip","pattern":"none","song":false,"melody":"born","chords":"off","snare":false,"duty":0.25,"T2s":0.25,"T2":1.2,"J":0,"S":1,"e":0,"p":0.25,"density":0.6,"leadOct":3,"hold":2,"echoSync":0,"echo":false,"basis":"Z","key":"E","mkick":0,"mbass":0,"mhat":0,"mlead":0.45,"mchord":0,"msnare":0},"sections":[{"name":"one-note","bars":4,"focus":["#mode","duty"],"el":{"t":"Μία νότα 8-bit","h":"Τετράγωνο κύμα, σβήσιμο από το σπιν","x":"Η λειτουργία 8-bit παίζει κάθε νότα με τετράγωνο κύμα, όπως οι παλιές κονσόλες. Το πόσο γρήγορα σβήνει το ορίζει ακόμη το σπιν (T2*). Το εύρος παλμού αλλάζει το χρώμα: λεπτό, ρινικό ή γεμάτο."},"en":{"t":"One 8-bit note","h":"A square wave, faded by the spin","x":"8-bit mode plays each note as a square wave, like an old console. The spin still sets how fast it fades (T2*). Pulse width changes the colour: thin, nasal or full."}},{"name":"chords","bars":8,"set":{"song":true,"chords":"ring"},"ramp":{"mchord":[0.6,2]},"focus":["#songOn","#chords","mchord"],"el":{"t":"Οι συγχορδίες κάνουν το τραγούδι","h":"Ένας κύκλος 8 μέτρων: E E F G · E E D F","x":"Ένα απλό τραγούδι είναι ένας κύκλος συγχορδιών που επαναλαμβάνεται. Εδώ οκτώ μέτρα στον φρύγιο τρόπο του Μι. Κάθε συγχορδία είναι power chord: θεμέλιο, πέμπτη και οκτάβα."},"en":{"t":"Chords make the song","h":"An 8-bar loop: E E F G · E E D F","x":"A simple song is a loop of chords that repeats. Here, eight bars in E phrygian. Each chord is a power chord: root, fifth and octave."}},{"name":"beat","bars":8,"set":{"pattern":"rolling"},"ramp":{"mkick":[0.9,1],"mhat":[0.14,2]},"focus":["mkick","mhat"],"el":{"t":"Ο ρυθμός","h":"Kick σε κάθε χτύπο, hi-hat ανάμεσα","x":"Το kick είναι τρίγωνο που πέφτει γρήγορα σε τόνο, το hi-hat θόρυβος από καταχωρητή ολίσθησης, όπως στις κονσόλες. Τέσσερα χτυπήματα στο μέτρο κρατούν όλο το τραγούδι."},"en":{"t":"The beat","h":"Kick on every beat, hi-hat in between","x":"The kick is a triangle wave diving in pitch; the hi-hat is noise from a shift register, as on the consoles. Four beats to the bar hold the whole song together."}},{"name":"bass","bars":8,"ramp":{"mbass":[0.55,2]},"focus":["mbass"],"el":{"t":"Το μπάσο ακολουθεί","h":"Η ρίζα κάθε συγχορδίας, στα 16α ανάμεσα στα kick","x":"Το μπάσο παίζει τη ρίζα της τρέχουσας συγχορδίας, στα τρία 16α μετά από κάθε kick. Έτσι ο κύκλος ακούγεται και στο χαμηλό. Κάθε νότα κόβεται όταν το σπιν πέσει κάτω από το κατώφλι."},"en":{"t":"The bass follows","h":"The root of each chord, on the 16ths between kicks","x":"The bass plays the root of the current chord on the three 16ths after each kick, so the loop is heard in the low end too. Each note cuts off when the spin falls below a threshold."}},{"name":"verse","bars":8,"set":{"chords":"chug","melody":"hook","T2s":0.06,"duty":0.25},"ramp":{"mlead":[0.35,1],"mchord":[0.5,1]},"focus":["#chords","#melody","T2s"],"el":{"t":"Κουπλέ: ήσυχα","h":"Σύντομο T2*, συγχορδίες με παλάμη","x":"Το κουπλέ κρατά την ενέργεια χαμηλά: οι συγχορδίες παίζονται κοφτές στα 16α και το σύντομο T2* κάνει κάθε νότα μικρή. Η μελωδία είναι πια ένα μοτίβο δύο μέτρων· κάθε δύο μέτρα μια μέτρηση διαλέγει φράση."},"en":{"t":"Verse: quiet","h":"Short T2*, palm-muted chords","x":"The verse keeps the energy low: chords are chopped into 16ths and a short T2* keeps every note small. The melody is now a 2-bar motif; every two bars a measurement picks the phrase."}},{"name":"chorus","bars":8,"set":{"chords":"ring","snare":true,"duty":0.5,"echoSync":3},"ramp":{"T2s":[0.2,1],"mchord":[0.85,1],"mlead":[0.45,1],"msnare":[0.3,1]},"focus":["#chords","#snare","#sync"],"el":{"t":"Ρεφρέν: δυνατά","h":"Συγχορδίες που αντηχούν, snare, ηχώ","x":"Το ρεφρέν ανοίγει τα πάντα: οι συγχορδίες αντηχούν όλο το μέτρο, το snare χτυπά στο 2 και στο 4, το τετράγωνο κύμα γεμίζει και η ηχώ του σπιν επιστρέφει κάθε νότα μετά από 3/16."},"en":{"t":"Chorus: loud","h":"Ringing chords, snare, echo","x":"The chorus opens everything up: chords ring for the whole bar, the snare hits 2 and 4, the square wave fills out and the spin echo brings each note back after 3/16."}},{"name":"bell-hook","bars":8,"set":{"e":1,"p":0},"focus":["e","p"],"el":{"t":"Το μοτίβο στην κατάσταση Bell","h":"Τα σπιν συμφωνούν πάντα: μόνο το μοτίβο και η οκτάβα του","x":"Με κρύο γείτονα και πλήρη CNOT τα δύο σπιν είναι σε κατάσταση Bell και δίνουν πάντα το ίδιο αποτέλεσμα. Η μέτρηση διαλέγει πια μόνο το μοτίβο ή το μοτίβο μία οκτάβα πάνω: το τραγούδι κλειδώνει."},"en":{"t":"The hook in the Bell state","h":"The spins always agree: only the motif and its octave","x":"With a cold partner and a full CNOT the two spins are in a Bell state and always give the same result. The measurement now picks only the motif or the motif an octave up: the song locks in."}},{"name":"ending","bars":4,"set":{"pattern":"none","snare":false},"ramp":{"mlead":[0,4],"mchord":[0,4]},"focus":["mlead","mchord"],"el":{"t":"Το τέλος","h":"Τα τύμπανα σταματούν, όλα σβήνουν","x":"Ένα τραγούδι χρειάζεται τέλος: τα τύμπανα φεύγουν και οι τελευταίες συγχορδίες σβήνουν. Αυτό είναι όλο: συγχορδίες, ρυθμός, μπάσο, ήσυχο κουπλέ, δυνατό ρεφρέν, μοτίβο, τέλος."},"en":{"t":"The ending","h":"Drums stop, everything fades","x":"A song needs an ending: the drums drop out and the last chords fade. That's all of it: chords, beat, bass, quiet verse, loud chorus, hook, ending."}}]},"level1":{"title":"Level 1 (game loop)","bpm":150,"seed":8,"set":{"mode":"chip","pattern":"gallop","song":true,"melody":"hook","chords":"chug","snare":false,"duty":0.25,"T2s":0.08,"T2":1.2,"e":0,"p":0.25,"echoSync":3,"key":"G","mkick":0.8,"mbass":0.5,"mhat":0.12,"mlead":0.4,"mchord":0.45,"msnare":0.25},"sections":[{"name":"explore","bars":8},{"name":"danger","bars":8,"set":{"chords":"ring","snare":true,"duty":0.5,"e":0.5,"p":0},"ramp":{"T2s":[0.18,1],"mchord":[0.8,1]}}]},"live":{"title":"Live set: Spinoras","bpm":145,"seed":1954,"set":{"mode":"spin","pattern":"rolling","e":0,"p":0.25,"T2s":0.05,"T2":0.4,"J":4,"S":1,"echoSync":2,"mkick":0.9,"mbass":0.6,"mhat":0.14,"mlead":0.32},"sections":[{"name":"warm-up spin","bars":16,"set":{"pattern":"none"},"ramp":{"T2s":[0.035,12]}},{"name":"rolling","bars":32,"set":{"pattern":"rolling"},"ramp":{"kKnob":[3.2,16],"bright":[5,16]}},{"name":"8-bit switch","bars":32,"set":{"mode":"chip","song":true,"chords":"chug","melody":"hook","duty":0.25}},{"name":"grunge chorus","bars":16,"set":{"chords":"ring","snare":true,"duty":0.5,"mchord":0.8}},{"name":"Bell breakdown","bars":16,"set":{"mode":"spin","pattern":"none","chords":"off","snare":false,"melody":"born","song":false},"ramp":{"p":[0,4],"e":[1,12]}},{"name":"riser","bars":8,"set":{"e":0,"p":0.5,"J":150,"S":100,"pattern":"riser","hold":8,"leadOct":2},"ramp":{"S":[1.2,8]}},{"name":"drop","bars":32,"set":{"mode":"chip","pattern":"rolling","song":true,"chords":"ring","snare":true,"melody":"hook","e":1,"p":0,"J":4,"S":1,"hold":2,"leadOct":3}}]}};
+const SL = window.SpinSong;
 const OFFLINE = true;
 
 /* ================= γλώσσα ================= */
 const EN = {
-  tagline: 'Two nuclear spins, one ladder filter, 145 BPM', play: 'Play', lessonBtn: 'Lesson', stopLive: 'Stop', fullscreen: 'Fullscreen', scenes: 'Scenes',
+  tagline: 'Two nuclear spins, one ladder filter, 145 BPM', play: 'Play', lessonBtn: 'Lesson', lessonPhys: '1 · How the physics plays', lessonSong: '2 · Build a simple song (8-bit)', mChip: '8-bit & song', mChipS: 'console voices, chords, hook', songOn: 'Progression E E F G · E E D F', chordsL: 'Chords', off: 'none', melodyL: 'Melody', tSong: 'Song or live set', tSongN: 'A song is a JSON file of sections. Sections become scenes (keys 1–9) for live use; the autopilot plays it through. The same format renders from the command line and from AI agents.', songLoad: 'Load', songPlay: 'Autopilot', stopLive: 'Stop', fullscreen: 'Fullscreen', scenes: 'Scenes',
   mSpin: 'Spin', mSpinS: 'how it fades and how it beats', mEcho: 'Spin echo', mEchoS: 'π pulse at time τ', echoOn: 'Echo', sync: 'Sync 2τ', free: 'free',
   mLink: 'Link', mLinkS: 'CNOT gate and partner temperature', basis: 'Readout basis', mLad: 'Ladder filter', mLadS: '4 poles, −24 dB/octave',
   mGroove: 'Groove', mGrooveS: 'the Born rule picks the notes', pattern: 'Pattern', noDrums: 'no drums', root: 'Key', tuning: 'Tuning', tet: '12-TET, A4 = 435 Hz',
@@ -1014,7 +1396,10 @@ const KDEF = {
   mkick: { el: 'Kick', en: 'Kick', min: 0, max: 1.2, get: () => cfg.mix.kick, set: v => { cfg.mix.kick = v; }, fmt: v => num(v, 2) },
   mbass: { el: 'Μπάσο', en: 'Bass', min: 0, max: 1.2, get: () => cfg.mix.bass, set: v => { cfg.mix.bass = v; }, fmt: v => num(v, 2) },
   mhat: { el: 'Hat', en: 'Hat', min: 0, max: 0.5, get: () => cfg.mix.hat, set: v => { cfg.mix.hat = v; }, fmt: v => num(v, 2) },
-  mlead: { el: 'Lead', en: 'Lead', min: 0, max: 1, get: () => cfg.mix.lead, set: v => { cfg.mix.lead = v; }, fmt: v => num(v, 2) }
+  mlead: { el: 'Lead', en: 'Lead', min: 0, max: 1, get: () => cfg.mix.lead, set: v => { cfg.mix.lead = v; }, fmt: v => num(v, 2) },
+  duty: { el: 'Εύρος παλμού', en: 'Pulse width', min: 0.125, max: 0.5, get: () => cfg.duty, set: v => { cfg.duty = v; }, fmt: v => num(v * 100, 1) + '%' },
+  mchord: { el: 'Συγχορδίες', en: 'Chords', min: 0, max: 1.2, get: () => cfg.mix.chord, set: v => { cfg.mix.chord = v; }, fmt: v => num(v, 2) },
+  msnare: { el: 'Snare', en: 'Snare', min: 0, max: 0.8, get: () => cfg.mix.snare, set: v => { cfg.mix.snare = v; }, fmt: v => num(v, 2) }
 };
 function ms(v) { return v < 1 ? num(v * 1000, v < 0.01 ? 1 : 0) + ' ms' : num(v, 2) + ' s'; }
 const knobs = new Map();
@@ -1050,7 +1435,7 @@ function makeKnob(host) {
   k.host = host; knobs.set(key, k); k.relabel();
 }
 document.querySelectorAll('.knob').forEach(makeKnob);
-function syncAll() { knobs.forEach(k => k.sync()); document.getElementById('echo').setAttribute('aria-pressed', cfg.phys.echo || cfg.echoSync > 0); document.getElementById('sync').value = cfg.echoSync; document.querySelectorAll('#basis button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === cfg.basis)); document.getElementById('pattern').value = cfg.pattern; document.getElementById('root').value = cfg.rootMidi; document.getElementById('tuning').value = cfg.tuning; document.getElementById('seed').value = cfg.seed; document.getElementById('bpm').value = cfg.bpm; document.documentElement.style.setProperty('--bpm', cfg.bpm); readout(); }
+function syncAll() { knobs.forEach(k => k.sync()); document.getElementById('echo').setAttribute('aria-pressed', cfg.phys.echo || cfg.echoSync > 0); document.getElementById('sync').value = cfg.echoSync; document.querySelectorAll('#basis button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === cfg.basis)); document.getElementById('pattern').value = cfg.pattern; document.getElementById('root').value = cfg.rootMidi; document.getElementById('tuning').value = cfg.tuning; document.getElementById('seed').value = cfg.seed; document.querySelectorAll('#mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === cfg.mode)); document.getElementById('songOn').setAttribute('aria-pressed', !!cfg.song); document.getElementById('snare').setAttribute('aria-pressed', !!cfg.snare); document.getElementById('chords').value = cfg.chords; document.getElementById('melody').value = cfg.melody; document.getElementById('bpm').value = cfg.bpm; document.documentElement.style.setProperty('--bpm', cfg.bpm); readout(); }
 function changed(key) { takeover(); readout(); highlightHear(); }
 
 /* ================= σκηνές ================= */
@@ -1063,9 +1448,17 @@ const SCENES = [
 ];
 function buildScenes() {
   const box = document.getElementById('scenes'); box.querySelectorAll('button').forEach(b => b.remove());
+  if (loaded) { loaded.cues.forEach((c, i) => { const b = document.createElement('button'); b.className = 'chip'; b.innerHTML = `${c.label}${i < 9 ? '<kbd>' + (i + 1) + '</kbd>' : ''}`; b.onclick = () => setScene(i); box.appendChild(b); }); return; }
   SCENES.forEach((s, i) => { const b = document.createElement('button'); b.className = 'chip'; b.innerHTML = `${lang === 'en' ? s.en : s.el}<kbd>${i + 1}</kbd>`; b.onclick = () => scene(i); box.appendChild(b); });
 }
-function scene(i) { takeover(); const s = SCENES[i]; if (i !== 4) { cfg.tuning = 'tet'; if (cfg.pattern === 'half') cfg.pattern = 'rolling'; } s.set(cfg); refreshPrep(); syncAll(); highlightHear(); toast((lang === 'en' ? s.en : s.el)); }
+let loaded = null;   // { spec, cues } of a loaded song or live set
+/* scene i of a loaded set = the state at the start of section i (everything set before it, ramps finished) */
+function setScene(i) {
+  takeover();
+  for (let k = 0; k <= i; k++) { const c = loaded.cues[k]; if (c.jump) for (const n in c.jump) knobs.get(n).setV(c.jump[n]); applySet(c.set); if (k < i) (c.ramp || []).forEach(([n, to]) => knobs.get(n).setV(to)); }
+  refreshPrep(); syncAll(); highlightHear(); toast(loaded.cues[i].label);
+}
+function scene(i) { if (loaded) return setScene(i); takeover(); const s = SCENES[i]; if (i !== 4) { cfg.tuning = 'tet'; if (cfg.pattern === 'half') cfg.pattern = 'rolling'; } s.set(cfg); refreshPrep(); syncAll(); highlightHear(); toast((lang === 'en' ? s.en : s.el)); }
 
 /* ================= ενδείξεις ================= */
 function readout() {
@@ -1203,7 +1596,7 @@ document.getElementById('dice').onclick = () => { cfg.seed = Math.floor(Math.ran
 document.addEventListener('keydown', e => {
   if (e.target.closest('input, select, textarea')) return;
   if (e.code === 'Space') { e.preventDefault(); running ? stopLive() : startLive(); }
-  const n = +e.key; if (n >= 1 && n <= SCENES.length) scene(n - 1);
+  const n = +e.key; if (n >= 1 && n <= (loaded ? Math.min(9, loaded.cues.length) : SCENES.length)) scene(n - 1);
 });
 
 /* ================= σύνθεση ================= */
@@ -1348,10 +1741,10 @@ const fmtV = v => typeof v === 'number' ? (Math.abs(v) < 1e-6 && v !== 0 ? v.toE
 function toast(t) { const n = document.getElementById('toast'); n.textContent = t; n.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { n.hidden = true; }, 1600); }
 
 /* ================= μάθημα: αυτόματος πιλότος 96 μέτρων ================= */
-const LESSON = [
+const LESSON_PHYS = [
   { bar: 0, len: 8, focus: ['stage'],
     jump: { T2s: 0.3, T2: 1.2, J: 2, S: 1, tau: 0.05, e: 0, p: 0.25, bright: 2.5, kKnob: 1.6, bassBright: 2.2, density: 0.55, leadOct: 3, mkick: 0, mbass: 0, mhat: 0, mlead: 0.45 },
-    set: { pattern: 'none', echo: false, echoSync: 0, basis: 'Z', tuning: 'tet', hold: 2 },
+    set: { pattern: 'none', echo: false, echoSync: 0, basis: 'Z', tuning: 'tet', hold: 2, mode: 'spin', song: false, melody: 'born', chords: 'off', snare: false },
     el: { t: 'Ένα σπιν, μία νότα', h: 'Κοίτα το κεχριμπαρί βέλος σε κάθε νότα', x: 'Κάθε νότα του lead είναι ένας πυρήνας που γυρίζει. Το κεχριμπαρί βέλος είναι η μαγνήτισή του: όσο γυρίζει ακούς τόνο, όσο μικραίνει ο ήχος σβήνει.' },
     en: { t: 'One spin, one note', h: 'Watch the amber arrow on every note', x: 'Every lead note is a nucleus precessing. The amber arrow is its magnetisation: while it turns you hear a tone, as it shrinks the sound fades.' } },
   { bar: 8, len: 8, focus: ['T2s'], ramp: [['T2s', 0.035, 6]],
@@ -1385,7 +1778,19 @@ const LESSON = [
     el: { t: 'Λύσε τη σύνδεση', h: 'CNOT 180° → 80°: επιστρέφουν τα τρίτονα', x: 'Η CNOT χαλαρώνει: το βέλος μεγαλώνει ξανά, ο συντονισμός πέφτει και τα τρίτονα γυρίζουν στη μελωδία. Από εδώ, η σκηνή είναι δική σου.' },
     en: { t: 'Release the link', h: 'CNOT 180° → 80°: the tritones return', x: 'The CNOT loosens: the arrow grows again, the resonance drops and the tritones come back into the melody. From here the scene is yours.' } }
 ];
-const LESSON_END = 96;
+let LESSON = LESSON_PHYS, LESSON_END = 96;
+/* a song spec (JSON) → lesson cues: knob values jump, switches are set, knob ramps run over bars */
+function specToCues(spec) {
+  let bar = 0;
+  return spec.sections.map((sec, i) => {
+    const all = Object.assign({}, i === 0 ? spec.set : {}, sec.set), jump = {}, set = {};
+    for (const k in all) (KDEF[k] ? jump : set)[k] = all[k];
+    const name = sec.name || ('§' + (i + 1));
+    const c = { bar, len: sec.bars, jump, set, focus: sec.focus || [], ramp: Object.entries(sec.ramp || {}).map(([k, r]) => [k, r[0], r[1]]),
+      el: sec.el || { t: name, h: '', x: '' }, en: sec.en || { t: name, h: '', x: '' }, label: name };
+    bar += sec.bars; return c;
+  });
+}
 const LESSON_DONE = { el: { t: 'Σειρά σου', x: 'Το μάθημα τελείωσε, η μουσική συνεχίζει. Πλήκτρα 1–5: σκηνές. Space: στοπ. Γύρνα οποιοδήποτε κουμπί.' },
   en: { t: 'Your turn', x: 'The lesson is over; the music keeps going. Keys 1–5: scenes. Space: stop. Turn any knob.' } };
 const lesson = { active: false, paused: false, done: false, bar: 0, idx: -1, start: {}, lastT: 0, auto: false };
@@ -1402,6 +1807,9 @@ function applySet(s) {
   if ('basis' in s) cfg.basis = s.basis;
   if ('tuning' in s) cfg.tuning = s.tuning;
   if ('hold' in s) cfg.hold = s.hold;
+  for (const k of ['mode', 'song', 'melody', 'chords', 'snare']) if (k in s) cfg[k] = s[k];
+  if ('key' in s && SL.KEY_MIDI[s.key] != null) cfg.rootMidi = SL.KEY_MIDI[s.key];
+  if ('T1' in s) cfg.phys.T1 = s.T1;
 }
 function enterCue(i) {
   const c = LESSON[i]; lesson.idx = i; lesson.auto = true;
@@ -1445,9 +1853,15 @@ function renderLesson() {
 function updateTrack() {
   [...document.getElementById('lTrack').children].forEach((s, i) => { const c = LESSON[i]; const u = Math.max(0, Math.min(1, (lesson.bar - c.bar) / c.len)); s.firstChild.style.width = (u * 100) + '%'; s.classList.toggle('now', i === lesson.idx && !lesson.done); });
 }
-function startLesson() {
+function startLesson(kind) {
+  if (kind === 'song') { LESSON = specToCues(SONGS.simple); LESSON_END = LESSON.reduce((a, c) => a + c.len, 0); }
+  else if (kind === 'set' && loaded) { LESSON = loaded.cues; LESSON_END = LESSON.reduce((a, c) => a + c.len, 0); }
+  else { LESSON = LESSON_PHYS; LESSON_END = 96; }
+  document.getElementById('lTrack').innerHTML = '';
+  document.getElementById('lmenu').hidden = true;
   lesson.active = true; lesson.paused = false; lesson.done = false; lesson.bar = 0; lesson.idx = -1;
-  cfg.bpm = 145; setBpm(145);
+  const bpm = kind === 'song' ? (SONGS.simple.bpm || 145) : kind === 'set' && loaded ? (loaded.spec.bpm || 145) : 145;
+  cfg.bpm = bpm; setBpm(bpm);
   if (running) stopLive();
   enterCue(0); startLive(); lesson.lastT = ctx.currentTime; lesson.t0 = nextT;
 }
@@ -1481,7 +1895,31 @@ function drawLessonBand(W, H) {
   g.fillStyle = COL.ch1; g.font = '600 24px ' + css('--f-mono'); g.fillText(liveLine(), 28, 170);
   g.textAlign = 'left';
 }
-document.getElementById('lessonBtn').onclick = () => lesson.active ? exitLesson() : startLesson();
+document.getElementById('lessonBtn').onclick = () => { if (lesson.active) return exitLesson(); const m = document.getElementById('lmenu'); m.hidden = !m.hidden; };
+document.querySelectorAll('#lmenu [data-lesson]').forEach(b => b.onclick = () => startLesson(b.dataset.lesson));
+document.addEventListener('click', ev => { const m = document.getElementById('lmenu'); if (!m.hidden && !ev.target.closest('.lwrap')) m.hidden = true; });
+/* ---- new controls: 8-bit & song ---- */
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => { takeover(); cfg.mode = b.dataset.m; syncAll(); });
+document.getElementById('songOn').onclick = () => { takeover(); cfg.song = !cfg.song; syncAll(); };
+document.getElementById('snare').onclick = () => { takeover(); cfg.snare = !cfg.snare; syncAll(); };
+document.getElementById('chords').onchange = e => { takeover(); cfg.chords = e.target.value; };
+document.getElementById('melody').onchange = e => { takeover(); cfg.melody = e.target.value; };
+/* ---- songs and live sets ---- */
+function useSpec(spec, from) {
+  const v = SL.validate(spec), st = document.getElementById('songStatus');
+  if (!v.ok) { st.textContent = (lang === 'en' ? 'Not loaded: ' : 'Δεν φορτώθηκε: ') + v.errors.slice(0, 3).join(' · '); return; }
+  loaded = { spec, cues: specToCues(spec) };
+  buildScenes(); setScene(0);
+  st.textContent = `${spec.title || from} · ${v.bars} ${lang === 'en' ? 'bars' : 'μέτρα'} · ${loaded.cues.length} ${lang === 'en' ? 'scenes' : 'σκηνές'}`;
+  document.getElementById('songPlay').disabled = false; document.getElementById('songClear').disabled = false;
+}
+document.getElementById('songLoad').onclick = () => { const k = document.getElementById('songPick').value; useSpec(JSON.parse(JSON.stringify(SONGS[k])), k); };
+document.getElementById('songFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { useSpec(JSON.parse(await f.text()), f.name); } catch (err) { document.getElementById('songStatus').textContent = lang === 'en' ? 'This file is not valid JSON.' : 'Το αρχείο δεν είναι έγκυρο JSON.'; }
+};
+document.getElementById('songClear').onclick = () => { loaded = null; buildScenes(); document.getElementById('songStatus').textContent = ''; document.getElementById('songPlay').disabled = true; document.getElementById('songClear').disabled = true; document.getElementById('songFile').value = ''; };
+document.getElementById('songPlay').onclick = () => startLesson('set');
 document.getElementById('lPause').onclick = () => { lesson.paused = !lesson.paused; if (ctx) lesson.lastT = ctx.currentTime; if (!lesson.paused && lesson.idx >= 0) { const c = LESSON[lesson.idx]; (c.ramp || []).forEach(([k, to, bars]) => { const kb = knobs.get(k), e = ease(Math.max(0, Math.min(1, (lesson.bar - c.bar) / (bars || c.len)))), nt = kb.nOf(to); lesson.start[k] = e < 0.999 ? (kb.n - nt * e) / (1 - e) : kb.n; }); } renderLesson(); };
 document.getElementById('lNext').onclick = () => { if (lesson.idx < 0) return; finishCue(lesson.idx); const nx = LESSON[lesson.idx + 1]; lesson.bar = nx ? nx.bar : LESSON_END; lesson.paused = false; if (nx) enterCue(lesson.idx + 1); else { lesson.done = true; focusOn([]); renderLesson(); } };
 document.getElementById('lExit').onclick = exitLesson;

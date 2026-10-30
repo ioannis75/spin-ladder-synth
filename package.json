@@ -1,14 +1,32 @@
 {
   "name": "spin-ladder-synth",
-  "version": "1.0.0",
-  "description": "A two-spin NMR synthesizer with a ladder filter, a psytrance groove engine and an autopilot lesson. Classical simulation, browser only.",
+  "version": "1.1.0",
+  "description": "A two-spin NMR synthesizer with a ladder filter, an 8-bit mode, a psytrance/song engine, autopilot lessons, and a JSON song spec + CLI that AI agents can compose with.",
   "private": true,
   "scripts": {
     "fixture": "node scripts/make-fixture.js",
     "test": "node test/verify.js",
     "build": "node scripts/build.js",
     "render": "node scripts/render.js",
-    "all": "npm run fixture && npm test && npm run build"
+    "all": "npm run fixture && npm test && npm run songs && npm run build",
+    "songs": "node cli/spin-ladder.js validate songs/simple-song.json && node cli/spin-ladder.js validate songs/level-1-loop.json && node cli/spin-ladder.js validate songs/live-set.json"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "spin-ladder": "cli/spin-ladder.js"
+  },
+  "keywords": [
+    "quantum",
+    "nmr",
+    "synthesizer",
+    "chiptune",
+    "8-bit",
+    "game-music",
+    "psytrance",
+    "ai-agents",
+    "music-education",
+    "web-audio"
+  ]
 }

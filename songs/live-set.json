@@ -1,0 +1,16 @@
+{
+  "title": "Live set: Spinoras",
+  "bpm": 145,
+  "seed": 1954,
+  "set": { "mode": "spin", "pattern": "rolling", "e": 0, "p": 0.25, "T2s": 0.05, "T2": 0.4, "J": 4, "S": 1, "echoSync": 2,
+           "mkick": 0.9, "mbass": 0.6, "mhat": 0.14, "mlead": 0.32 },
+  "sections": [
+    { "name": "warm-up spin", "bars": 16, "set": { "pattern": "none" }, "ramp": { "T2s": [0.035, 12] } },
+    { "name": "rolling", "bars": 32, "set": { "pattern": "rolling" }, "ramp": { "kKnob": [3.2, 16], "bright": [5, 16] } },
+    { "name": "8-bit switch", "bars": 32, "set": { "mode": "chip", "song": true, "chords": "chug", "melody": "hook", "duty": 0.25 } },
+    { "name": "grunge chorus", "bars": 16, "set": { "chords": "ring", "snare": true, "duty": 0.5, "mchord": 0.8 } },
+    { "name": "Bell breakdown", "bars": 16, "set": { "mode": "spin", "pattern": "none", "chords": "off", "snare": false, "melody": "born", "song": false }, "ramp": { "p": [0, 4], "e": [1, 12] } },
+    { "name": "riser", "bars": 8, "set": { "e": 0, "p": 0.5, "J": 150, "S": 100, "pattern": "riser", "hold": 8, "leadOct": 2 }, "ramp": { "S": [1.2, 8] } },
+    { "name": "drop", "bars": 32, "set": { "mode": "chip", "pattern": "rolling", "song": true, "chords": "ring", "snare": true, "melody": "hook", "e": 1, "p": 0, "J": 4, "S": 1, "hold": 2, "leadOct": 3 } }
+  ]
+}

@@ -65,6 +65,21 @@ catch (e) { rows.push({ name: 'B10b εισαγωγή FID', expected: 'ok', got: 
 // B12 echo sync: 2τ_ήχου = n δέκατα έκτα
 { const c = Object.assign(E.defaults(), { echoSync: 2 }); const A = E.toAudio(E.syncedPhys(c)); chk('B12 2τ_ήχου με sync=2 στα 145 BPM (s)', 2 * 60 / 145 / 4, 2 * A.tau, 1e-12); }
 
+// B13–B17 λειτουργία 8-bit και μορφή τραγουδιού
+{ const f = E.midiHz(64), q = E.pulseHz(f); chk('B13 κβάντιση περιόδου 2A03: |Δf|/f για E4', 0, Math.abs(q - f) / f, 0.005);
+  const env = E.spinEnv(E.prepare(0, 0), E.toAudio({ J: 0, nu0: 0, nu1: 0, T2: 1, T2s: 0.06, T1: 2, tau: 0.155, echo: true, S: 1 }), 0, 0.6);
+  chk('B14 περιβάλλουσα 8-bit: αναβίωση ηχούς στο 2τ (4 bit)', Math.round(Math.exp(-0.31) * 15) / 15, env[Math.round(0.31 * 240)], 1 / 15 + 1e-9);
+  const c = Object.assign(E.defaults(), { e: 1, p: 0, melody: 'hook', mode: 'chip', song: true });
+  const outs = new Set(E.grooveEvents(c, 64).filter(e => e.outcome !== undefined).map(e => e.outcome));
+  rows.push({ name: 'B15 hook σε κατάσταση Bell: μόνο φράσεις A / A+οκτάβα (00, 11)', expected: '0,3', got: [...outs].sort().join(','), dev: '', ok: [...outs].every(o => o === 0 || o === 3) && outs.size > 0 });
+  const s = Object.assign(E.defaults(), { song: true, mode: 'chip' }), bass = E.grooveEvents(s, 8).filter(e => e.kind === 'ctri');
+  const bar = b => bass.find(e => Math.floor(e.t / (16 * E.stepSeconds(s.bpm)) + 1e-9) === b);
+  chk('B16 πρόοδος: ρίζα μέτρου 3 (G) / μέτρου 1 (E), ημιτόνια', 3, 12 * Math.log2(bar(3).freq / bar(1).freq), 1e-9);
+  const ev = E.grooveEvents(Object.assign(E.defaults(), { mode: 'chip', song: true, chords: 'ring', snare: true, melody: 'hook' }), 2);
+  const [Lc, Rc] = E.renderTimeline(ev, 2 * 16 * E.stepSeconds(145), 44100); let pk = 0, fin = true;
+  for (let i = 0; i < Lc.length; i++) { pk = Math.max(pk, Math.abs(Lc[i]), Math.abs(Rc[i])); if (!Number.isFinite(Lc[i])) fin = false; }
+  rows.push({ name: 'B17 απόδοση 8-bit + συγχορδίες + snare: πεπερασμένη, χωρίς ψαλιδισμό', expected: '0 < peak < 1', got: pk.toFixed(3), dev: '', ok: fin && pk > 0.05 && pk < 1 }); }
+
 const pass = rows.filter(r => r.ok).length;
 for (const r of rows) console.log((r.ok ? 'OK  ' : 'FAIL') + ' | ' + r.name + ' | αναμ. ' + (typeof r.expected === 'number' ? +r.expected.toPrecision(8) : r.expected) + ' | αποτ. ' + (typeof r.got === 'number' ? +r.got.toPrecision(8) : r.got) + ' | απόκλ. ' + (typeof r.dev === 'number' ? r.dev.toExponential(1) : r.dev));
 console.log(`\n${pass}/${rows.length} έλεγχοι πέρασαν`);

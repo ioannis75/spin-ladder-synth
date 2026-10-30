@@ -10,6 +10,7 @@ A synthesizer whose voices are two nuclear spins. A classical simulation of a tw
 
 - [`media/two-spins-five-moments.mp3`](media/two-spins-five-moments.mp3): *Two Spins, Five Moments* (4:05, mastered to −14 LUFS)
 - [`media/spin-ladder_145bpm_E_16bars.wav`](media/spin-ladder_145bpm_E_16bars.wav): a 16-bar loop at 145 BPM in E, ready for a DJ deck
+- [`media/decoherence-riot.mp3`](media/decoherence-riot.mp3): *Decoherence Riot*, an 8-bit grunge psytrance track made with the 8-bit mode (3:49)
 
 Both are rendered by `npm run render` from the same engine the instrument uses.
 
@@ -21,6 +22,49 @@ Both are rendered by `npm run render` from the same engine the instrument uses.
 - **Export loops.** Renders the current settings to sample-accurate WAV bars, named with BPM, key and seed.
 - **Use MIDI.** Notes play the lead (A4 = 435 Hz); CC 1–8 drive the main knobs; *Learn* remaps them. Needs Web MIDI (Chrome or Edge on a computer).
 - **Load Studio data.** FID exports from [Quantum Music Studio](https://github.com/pundora333/Quantum_Music_Studio) (format `pundora-fid-v3`) can be loaded as the lead voice.
+
+## 8-bit mode and songs
+
+- **8-bit mode** swaps the smooth spin tones for NES-style voices: two pulse widths, a stepped triangle bass, LFSR noise drums, 4-bit volume steps. The spin still shapes every note: T2* sets the fade, the echo returns at 2τ, J beats inside the note.
+- **Song form**: an 8-bar power-chord progression (E E F G · E E D F, in the chosen key), palm-muted or ringing chords, a snare backbeat, and a 2-bar hook whose phrase is picked by a measurement every two bars. In the Bell state the hook can only be the motif or its octave.
+- **Lesson 2, "Build a simple song"**: the autopilot builds an 8-bit song step by step (one note, chords, beat, bass, quiet verse, loud chorus, hook in the Bell state, ending) and explains each move.
+- **Songs and live sets**: load a song spec (JSON) in the page. Its sections become scenes on keys 1–9 for live use, and the autopilot can play it through.
+
+## Use with AI agents
+
+Spin Ladder is built so an AI agent (Claude, or any agent that can run a shell) can compose with it. A song is a small JSON file; one command renders it and returns a JSON report the agent can read and act on.
+
+```sh
+node cli/spin-ladder.js describe                       # every knob and switch, with ranges and meaning
+node cli/spin-ladder.js validate songs/simple-song.json
+node cli/spin-ladder.js render songs/simple-song.json  # mastered 24-bit WAV + report
+node cli/spin-ladder.js render songs/level-1-loop.json --loop --stems   # game-ready loop + stems
+```
+
+A song spec:
+
+```json
+{
+  "title": "Level 1", "bpm": 150, "seed": 8,
+  "set": { "mode": "chip", "pattern": "gallop", "song": true, "melody": "hook", "chords": "chug", "key": "G" },
+  "sections": [
+    { "name": "explore", "bars": 8 },
+    { "name": "danger", "bars": 8, "set": { "chords": "ring", "snare": true, "duty": 0.5 }, "ramp": { "T2s": [0.18, 1] } }
+  ]
+}
+```
+
+The report gives `lufs` (BS.1770 integrated loudness, mastered to −14 by default), `peakDbfs`, the RMS level of every section, and `dynamicRangeDb` between the loudest and quietest section, so an agent can check its own mix. Invalid specs come back with exact errors (`sections[2].set.T2s: 5 outside 0.004–1`).
+
+What it is good for:
+
+| Job | How |
+|---|---|
+| **Game music** | `--loop` folds the release tail onto the start, so the file loops without a click. `--stems` writes drums, bass, chords and lead separately for adaptive layering in a game engine. |
+| **Live sets** | Write a set as sections; load it in the page and switch scenes with keys 1–9 or MIDI, or let the autopilot run it. |
+| **Teaching** | Add `el` / `en` text and `focus` to sections and the spec becomes a lesson that plays and explains itself. |
+
+Agents should write original material: the instrument has its own progression and motif, and it is not meant for transcribing existing songs.
 
 ## The physics
 
@@ -53,7 +97,7 @@ All sound is produced classically from a classical simulation. You are not heari
 
 ## Verification
 
-`npm test` runs 29 checks of the model against analytical results:
+`npm test` runs 34 checks of the model against analytical results:
 
 | Check | Expected |
 |---|---|

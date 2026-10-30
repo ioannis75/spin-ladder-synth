@@ -9,6 +9,7 @@ jobs:
         with:
           node-version: 20
       - run: npm run all
+      - run: node cli/spin-ladder.js render songs/level-1-loop.json --loop --stems --out /tmp/l1.wav
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

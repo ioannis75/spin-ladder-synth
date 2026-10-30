@@ -260,6 +260,92 @@
     return out;
   }
 
+  /* ---------- λειτουργία 8-bit: φωνές τύπου NES με περιβάλλουσες από το μοντέλο σπιν ----------
+     Παλμός (polyBLEP, κβαντισμένη περίοδος 2A03), τριγωνικό 32 βημάτων, θόρυβος LFSR 15 bit,
+     ένταση 4 bit που ανανεώνεται στα 240 Hz. Η περιβάλλουσα κάθε νότας είναι |s(t)| του σπιν. */
+  const CPU = 1789773, FRAME = 240;
+  const pulseHz = f => { const t = Math.max(8, Math.round(CPU / (16 * f)) - 1); return CPU / (16 * (t + 1)); };
+  const triHz = f => { const t = Math.max(2, Math.round(CPU / (32 * f)) - 1); return CPU / (32 * (t + 1)); };
+  const q4 = v => Math.round(Math.max(0, Math.min(1, v)) * 15) / 15;
+  function blep(t, dt) { if (t < dt) { t /= dt; return t + t - t * t - 1; } if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; } return 0; }
+  function spinEnv(prep, A, q, dur) {
+    const nF = Math.ceil(dur * FRAME) + 1, env = new Float32Array(nF);
+    for (let k = 0; k < nF; k++) { const s = signalAt(prep, A, q, k / FRAME); env[k] = q4(Math.min(1, Math.hypot(s.re, s.im))); }
+    return env;
+  }
+  function chipPulse(o, fs) {   // o: freq (ή πίνακας για arpeggio 60 Hz), dur, duty, gain, env
+    const n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n);
+    const fr = (Array.isArray(o.freq) ? o.freq : [o.freq]).map(pulseHz), duty = o.duty || 0.5; let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / fs, f = fr[Math.floor(t * 60) % fr.length], dt = f / fs;
+      const e = o.env[Math.min(Math.floor(t * FRAME), o.env.length - 1)];
+      const v = (ph < duty ? 1 : -1) + blep(ph, dt) - blep((ph - duty + 1) % 1, dt) - (2 * duty - 1);
+      out[i] = o.gain * e * v * Math.min(1, (o.dur - t) / 0.004, t / 0.001);
+      ph += dt; if (ph >= 1) ph -= 1;
+    }
+    return out;
+  }
+  const TRI = Array.from({ length: 32 }, (_, i) => (i < 16 ? 15 - i : i - 16) / 7.5 - 1);
+  function chipTri(o, fs) {     // o: freq ή sweep(t), dur, gain, gate(t)
+    const n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n); let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / fs, f = triHz(o.sweep ? o.sweep(t) : o.freq);
+      out[i] = o.gain * (o.gate ? o.gate(t) : 1) * TRI[Math.floor(ph * 32) % 32] * Math.min(1, (o.dur - t) / 0.003);
+      ph += f / fs; if (ph >= 1) ph -= 1;
+    }
+    return out;
+  }
+  const NOISE_P = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
+  function chipNoise(o, fs) {   // o: dur, period, short, decay, gain
+    const n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n), clk = CPU / NOISE_P[o.period || 0] / fs;
+    let lfsr = 1, acc = 0;
+    for (let i = 0; i < n; i++) {
+      acc += clk; while (acc >= 1) { acc -= 1; const fb = (lfsr ^ (lfsr >> (o.short ? 6 : 1))) & 1; lfsr = (lfsr >> 1) | (fb << 14); }
+      const t = i / fs, k = Math.floor(t * FRAME) / FRAME;
+      out[i] = o.gain * q4(Math.exp(-k / o.decay)) * ((lfsr & 1) ? -1 : 1) * Math.min(1, (o.dur - t) / 0.003);
+    }
+    return out;
+  }
+  function chipKick(o, fs) {
+    const a = chipTri({ dur: 0.26, gain: o.gain, sweep: t => 46 + 160 * Math.exp(-t / 0.03), gate: t => q4(Math.exp(-t / 0.16)) }, fs);
+    const c = chipNoise({ dur: 0.012, period: 0, decay: 0.004, gain: o.gain * 0.5 }, fs);
+    for (let i = 0; i < c.length; i++) a[i] += c[i];
+    for (let i = 0; i < a.length; i++) a[i] = Math.tanh(1.4 * a[i]);
+    return a;
+  }
+  function chipSnare(o, fs) {
+    const a = chipNoise({ dur: 0.2, period: 6, decay: 0.07, gain: o.gain }, fs);
+    const b = chipTri({ dur: 0.05, gain: o.gain * 0.8, sweep: t => 190 - 900 * t }, fs);
+    for (let i = 0; i < b.length; i++) a[i] += b[i];
+    return a;
+  }
+  /* power chord (θεμέλιο + πέμπτη + οκτάβα) → fuzz tanh → φίλτρο σκάλας: cutoff από |s(t)|, συντονισμός από C */
+  function renderPower(o, fs) {
+    const env = spinEnv(o.prep, o.A, 0, o.dur), n = Math.max(1, Math.round(o.dur * fs)), out = new Float32Array(n);
+    const parts = [0, 7, 12].map((iv, j) => o.chip
+      ? chipPulse({ freq: midiHz(o.root + iv), dur: o.dur, duty: j === 1 ? 0.25 : (o.duty || 0.5), gain: 1, env }, fs)
+      : renderSpinVoice({ freq: midiHz(o.root + iv), dur: o.dur, prep: o.prep, A: o.A, q: 0, bright: 0, kKnob: 0, gain: 1, filter: false }, fs));
+    const lad = new Ladder(fs), k = 1.2 * (1 - o.prep.C) + 3.6 * o.prep.C;
+    for (let i = 0; i < n; i++) {
+      const x = Math.tanh((o.drive || 5) * (parts[0][i] + parts[1][i] + 0.6 * parts[2][i]) / 2.6);
+      const e = env[Math.min(Math.floor(i / fs * FRAME), env.length - 1)];
+      out[i] = o.gain * lad.process(x, (o.base || 240) * Math.pow(2, (o.bright || 3) * e), k, true);
+    }
+    return out;
+  }
+
+  /* ---------- μορφή τραγουδιού: αρμονική πρόοδος και μελωδικό μοτίβο (πρωτότυπα, Ε φρύγιος) ----------
+     PROG: μετατόπιση της ρίζας ανά μέτρο (κύκλος 8 μέτρων): E E F G | E E D F
+     HOOK: δύο φράσεις 2 μέτρων στο πλέγμα των 16ων [βήμα, ημιτόνια από τη ρίζα, διάρκεια]·
+     ο κανόνας Born διαλέγει φράση κάθε 2 μέτρα: 00 → A, 01 → B, 10 → B μία οκτάβα κάτω, 11 → A μία οκτάβα πάνω */
+  const PROG = [0, 0, 1, 3, 0, 0, -2, 1];
+  const HOOK = {
+    A: [[0, 12, 3], [3, 7, 1], [4, 8, 2], [6, 7, 2], [8, 3, 2], [10, 1, 2], [12, 0, 4], [16, 0, 2], [18, 3, 2], [20, 5, 2], [22, 7, 1], [23, 8, 1], [24, 7, 3], [27, 1, 1], [28, 0, 4]],
+    B: [[0, 0, 2], [2, 1, 1], [3, 3, 1], [4, 5, 4], [8, 8, 2], [10, 7, 2], [12, 5, 2], [14, 3, 2], [16, 1, 3], [19, 0, 1], [20, 1, 2], [22, 3, 2], [24, 0, 8]]
+  };
+  const HOOK_PICK = [['A', 0], ['B', 0], ['B', -12], ['A', 12]];
+  function bornOutcome(prep, basis, u) { const P = probs(prep.rho, basis); let o = 0; while (o < 3 && u > P[o]) { u -= P[o]; o++; } return o; }
+
   /* ---------- αλληλουχητής psytrance ----------
      Μπάσο: ίδια φυσική χαλάρωσης, αλλά πάντα χωρίς πύλη σύνδεσης (e = 0), ώστε να μη σβήνει. */
   const OUTCOME_SEMIS = [0, 6, -6, 12];   // 00 → θεμέλιο, 01/10 → τρίτονο (διαφωνία), 11 → οκτάβα (συμφωνία)
@@ -276,7 +362,9 @@
       e: 0, p: 0.25, basis: 'Z',
       bpm: 145, rootMidi: 28 /* E1 στο A4=435 */, pattern: 'rolling', density: 0.8, seed: 271828,
       leadOct: 3, bright: 3.5, kKnob: 2.6, bassBright: 2.2,
-      mix: { kick: 0.9, bass: 0.6, hat: 0.14, lead: 0.32 }, tuning: 'tet', echoSync: 0
+      mix: { kick: 0.9, bass: 0.6, hat: 0.14, lead: 0.32, chord: 0.5, snare: 0.3 }, tuning: 'tet', echoSync: 0,
+      // προσθήκες: λειτουργία 8-bit και μορφή τραγουδιού (όλα κλειστά = η αρχική συμπεριφορά)
+      mode: 'spin', duty: 0.5, song: false, melody: 'born', chords: 'off', snare: false
     };
   }
   function stepSeconds(bpm) { return 60 / bpm / 4; }
@@ -297,15 +385,39 @@
   /* επιστρέφει τα γεγονότα ενός βήματος (16ου) */
   function stepEvents(cfg, prep, step, t0, rng, fidF, prepBass) {
     const pat = PATTERNS[cfg.pattern] || PATTERNS.rolling, i = step % 16, st = stepSeconds(cfg.bpm);
-    const ph = syncedPhys(cfg), A = toAudio(ph), ev = [];
-    if (pat.kick[i] === '1') ev.push({ t: t0, kind: 'kick', gain: cfg.mix.kick });
-    if (pat.hat[i] === '1') ev.push({ t: t0, kind: 'hat', gain: cfg.mix.hat, seed: step + 1 });
-    if (pat.bass[i] === '1') ev.push({ t: t0, kind: 'spin', freq: midiHz(cfg.rootMidi), dur: st * 0.92, prep: prepBass || prepare(0, cfg.p), A, q: 0, bright: cfg.bassBright, kKnob: 1.2, gain: cfg.mix.bass, exciter: 0, drive: 1.4 });
-    if (pat.lead[i] === '1' && rng() < cfg.density) {
+    const ph = syncedPhys(cfg), A = toAudio(ph), ev = [], chip = cfg.mode === 'chip';
+    const mix = Object.assign({ chord: 0.5, snare: 0.3 }, cfg.mix);
+    const bar = Math.floor(step / 16), off = cfg.song ? PROG[bar % 8] : 0, root = cfg.rootMidi + off;
+    const pB = prepBass || prepare(0, cfg.p);
+    if (pat.kick[i] === '1') ev.push({ t: t0, kind: chip ? 'ckick' : 'kick', gain: mix.kick, voice: 'drums' });
+    if (pat.hat[i] === '1') ev.push(chip ? { t: t0, kind: 'cnoise', dur: 0.05, period: 1, short: true, decay: 0.014, gain: mix.hat, pan: 0.2, voice: 'drums' }
+                                         : { t: t0, kind: 'hat', gain: mix.hat, seed: step + 1, voice: 'drums' });
+    if (cfg.snare && (i === 4 || i === 12)) ev.push({ t: t0, kind: 'csnare', gain: mix.snare, voice: 'drums' });
+    if (pat.bass[i] === '1') ev.push(chip
+      ? { t: t0, kind: 'ctri', freq: midiHz(root + 12), dur: st * 0.92, gain: mix.bass * 0.9, gateEnv: spinEnv(pB, A, 0, st), voice: 'bass' }
+      : { t: t0, kind: 'spin', freq: midiHz(root), dur: st * 0.92, prep: pB, A, q: 0, bright: cfg.bassBright, kKnob: 1.2, gain: mix.bass, exciter: 0, drive: 1.4, voice: 'bass' });
+    // power chords: «chug» = 16α με παλάμη (σύντομο T2*), «ring» = μία συγχορδία ανά μέτρο που αντηχεί
+    if (cfg.chords === 'chug' && [0, 2, 3, 6, 8, 10, 11, 14].includes(i))
+      ev.push({ t: t0, kind: 'power', chip, root: root + 24, dur: st * 1.5, prep: prepare(0, 0), A: toAudio({ J: 0, nu0: 0, nu1: 0, T2: 1, T2s: 0.045, T1: 2, tau: 1, echo: false, S: 1 }), duty: 0.125, gain: mix.chord * 0.6, drive: 3, bright: 1.4, base: 200, pan: i % 4 ? 0.5 : -0.5, voice: 'chords' });
+    if (cfg.chords === 'ring' && i === 0)
+      ev.push({ t: t0, kind: 'power', chip, root: root + 24, dur: 16 * st, prep: prepare(0, 0.15), A: toAudio({ J: 0, nu0: 0, nu1: 0, T2: 6, T2s: 0.8, T1: 8, tau: 1, echo: false, S: 1 }), duty: 0.5, gain: mix.chord, drive: 6, bright: 3.2, base: 240, voice: 'chords' });
+    // μελωδία: «born» = μία μέτρηση ανά νότα (όπως πριν) · «hook» = ο Born διαλέγει φράση κάθε 2 μέτρα
+    let notes = [];
+    if (cfg.melody === 'hook') {
+      const phrase = Math.floor(step / 32), o = bornOutcome(prep, cfg.basis, mulberry32(cfg.seed + 7919 * phrase)());
+      const [name, sh] = HOOK_PICK[o], k = step % 32;
+      HOOK[name].forEach(([s, semi, len]) => { if (s === k) notes.push({ semis: semi + sh + off, len, o }); });
+    } else if (pat.lead[i] === '1' && rng() < cfg.density) {
       const P = probs(prep.rho, cfg.basis); let u = rng(), o = 0; while (o < 3 && u > P[o]) { u -= P[o]; o++; }
-      const dur = Math.min(2.5, Math.max(st * (cfg.hold || 2), A.echo ? 2 * A.tau + 3 * A.T2s : 0));
-      const base = { t: t0, freq: leadFreq(cfg, OUTCOME_SEMIS[o]), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: cfg.mix.lead, outcome: o, pan: (o === 1 ? -0.4 : o === 2 ? 0.4 : 0) };
-      ev.push(fidF ? Object.assign(base, { kind: 'fid', F: fidF, q: 0 }) : Object.assign(base, { kind: 'spin', prep, A, q: 0, exciter: 0.35 }));
+      notes.push({ semis: OUTCOME_SEMIS[o] + off, len: cfg.hold || 2, o });
+    }
+    for (const nt of notes) {
+      const dur = Math.min(2.5, Math.max(st * nt.len, A.echo ? 2 * A.tau + 3 * A.T2s : 0));
+      const base = { t: t0, freq: leadFreq(cfg, nt.semis), dur, bright: cfg.bright, kKnob: cfg.kKnob, gain: mix.lead, outcome: nt.o, pan: (nt.o === 1 ? -0.4 : nt.o === 2 ? 0.4 : 0), voice: 'lead' };
+      if (fidF) ev.push(Object.assign(base, { kind: 'fid', F: fidF, q: 0 }));
+      // 8-bit: η νότα είναι το αποτέλεσμα της μέτρησης, παιγμένο από ένα «φρέσκο» σπιν ανάγνωσης (pB)
+      else if (chip) ev.push(Object.assign(base, { kind: 'cpulse', duty: cfg.duty, env: spinEnv(pB, A, 0, dur), gain: mix.lead * 0.7 }));
+      else ev.push(Object.assign(base, { kind: 'spin', prep, A, q: 0, exciter: 0.35 }));
     }
     return ev;
   }
@@ -317,6 +429,12 @@
       case 'pop': return renderPopVoice(ev, fs);
       case 'mix': return renderMixture(ev, fs);
       case 'fid': return renderFidVoice(ev, fs);
+      case 'ckick': return chipKick(ev, fs);
+      case 'csnare': return chipSnare(ev, fs);
+      case 'cnoise': return chipNoise(ev, fs);
+      case 'cpulse': return chipPulse(ev, fs);
+      case 'ctri': return chipTri(Object.assign({}, ev, { gate: t => (ev.gateEnv[Math.min(Math.floor(t * FRAME), ev.gateEnv.length - 1)] > 0.3 ? 1 : 0) }), fs);
+      case 'power': return renderPower(ev, fs);
     }
     return new Float32Array(1);
   }
@@ -426,6 +544,7 @@
 
   const api = { prepare, describe, concurrence, probs, toAudio, signalAt, populationAt, Ladder, mulberry32, midiHz, studieHz, STUDIE_CENTS, A4,
     renderSpinVoice, renderPopVoice, renderMixture, renderKick, renderHat, renderFidVoice, parseStudioFID, fidAt,
-    PATTERNS, OUTCOME_SEMIS, defaults, stepSeconds, syncedPhys, stepEvents, renderEvent, renderTimeline, grooveEvents, pieceEvents, wav };
+    PATTERNS, OUTCOME_SEMIS, defaults, stepSeconds, syncedPhys, stepEvents, renderEvent, renderTimeline, grooveEvents, pieceEvents, wav,
+    PROG, HOOK, HOOK_PICK, spinEnv, pulseHz, triHz, chipPulse, chipTri, chipNoise, chipKick, chipSnare, renderPower };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.QSynth = api;
 })(typeof self !== 'undefined' ? self : this);
